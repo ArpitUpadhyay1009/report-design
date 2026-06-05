@@ -3,21 +3,43 @@ import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import "./productCard.css";
 
-const custTypeMeta: Record<
-  Product["custType"],
-  { label: string; tone: "amber" | "rose" | "emerald" | "sky" | "violet" }
-> = {
+type Tone = "amber" | "rose" | "emerald" | "sky" | "violet";
+type CustMeta = { label: string; tone: Tone };
+
+const custTypeMeta: Record<string, CustMeta> = {
   O: { label: "Original", tone: "amber" },
   B: { label: "Bulk", tone: "violet" },
   S: { label: "Special", tone: "emerald" },
   P: { label: "Premium", tone: "rose" },
 };
 
-const difficultyMeta: Record<Product["difficulty"], { label: string; level: number }> = {
-  RGE1: { label: "Easy", level: 1 },
-  RGE2: { label: "Standard", level: 2 },
-  RGE3: { label: "Complex", level: 3 },
-  RGE4: { label: "Expert", level: 4 },
+const custMetaFor = (custType: string): CustMeta =>
+  custTypeMeta[custType] ?? { label: custType || "—", tone: "sky" };
+
+const difficultyLabelMap: Record<string, string> = {
+  E1: "Easy",
+  E2: "Standard",
+  E3: "Complex",
+  E4: "Expert",
+  M1: "Medium",
+  D1: "Detailed",
+  SP: "Special",
+  TM1: "Tiny / Micro",
+};
+
+const difficultyMetaFor = (
+  difficulty: string
+): { label: string; level: number } => {
+  if (!difficulty || difficulty === "—") return { label: "Unrated", level: 2 };
+  const match = difficulty.match(/([A-Z]+\d*)$/);
+  const suffix = match ? match[1] : "";
+  const label = difficultyLabelMap[suffix] ?? difficulty;
+  let level = 2;
+  if (/E1$/.test(difficulty)) level = 1;
+  else if (/E2$/.test(difficulty)) level = 2;
+  else if (/E3$/.test(difficulty) || /M1$/.test(difficulty)) level = 3;
+  else if (/E4$/.test(difficulty) || /SP$/.test(difficulty)) level = 4;
+  return { label, level };
 };
 
 const inr = (n: number): string =>
@@ -31,15 +53,20 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const cust = custTypeMeta[product.custType];
-  const diff = difficultyMeta[product.difficulty];
+  const cust = custMetaFor(product.custType);
+  const diff = difficultyMetaFor(product.difficulty);
   const total = totalRate(product);
 
   return (
     <article className="product-card">
       <header className="product-card__top">
         <div className="product-card__image">
-          <ImageBox designCode={product.designCode} tone={cust.tone} size="lg" />
+          <ImageBox
+            designCode={product.designCode}
+            tone={cust.tone}
+            size="lg"
+            imageUrl={product.imageUrl}
+          />
         </div>
 
         <span

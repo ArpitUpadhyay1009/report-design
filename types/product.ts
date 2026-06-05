@@ -1,5 +1,5 @@
-export type CustomerType = "O" | "B" | "S" | "P";
-export type Difficulty = "RGE1" | "RGE2" | "RGE3" | "RGE4";
+export type CustomerType = string;
+export type Difficulty = string;
 
 export interface Product {
   id: string;
@@ -12,6 +12,7 @@ export interface Product {
   manufacturer: string;
   dep: string;
   polCtg: string;
+  tpRmCtg?: string;
   difficulty: Difficulty;
   filRate: number;
   polRate: number;

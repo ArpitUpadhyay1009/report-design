@@ -132,6 +132,7 @@ export default function RateEntryView({
                         designCode={p.designCode}
                         tone={custTone(p.custType)}
                         size="sm"
+                        imageUrl={p.imageUrl}
                       />
                     </div>
                   </td>

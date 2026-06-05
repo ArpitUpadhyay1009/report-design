@@ -3,12 +3,16 @@ import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import "./productRow.css";
 
-const custTone: Record<Product["custType"], "amber" | "violet" | "emerald" | "rose"> = {
+type Tone = "amber" | "violet" | "emerald" | "rose";
+
+const custToneMap: Record<string, Tone> = {
   O: "amber",
   B: "violet",
   S: "emerald",
   P: "rose",
 };
+
+const toneFor = (custType: string): Tone => custToneMap[custType] ?? "amber";
 
 const inr = (n: number): string =>
   new Intl.NumberFormat("en-IN", {
@@ -21,14 +25,19 @@ interface ProductRowProps {
 }
 
 export default function ProductRow({ product }: ProductRowProps) {
-  const tone = custTone[product.custType];
+  const tone = toneFor(product.custType);
   const total = totalRate(product);
 
   return (
     <tr className="product-row">
       <td className="product-row__cell product-row__cell--image">
         <div className="product-row__image">
-          <ImageBox designCode={product.designCode} tone={tone} size="sm" />
+          <ImageBox
+            designCode={product.designCode}
+            tone={tone}
+            size="sm"
+            imageUrl={product.imageUrl}
+          />
         </div>
       </td>
       <td className="product-row__cell">
