@@ -215,15 +215,19 @@ export default function RateEntryView({
                   </td>
                   {sections.map((s) => {
                     const sectionEntry = productEntries[s] ?? {};
+                    const isEditable = s === editableSection;
+                    // POL section in manager's read-only view stays empty until
+                    // real POL data arrives — don't pre-fill from the design.
                     const effectiveDmCtg =
-                      s === "POL" || s === "MANAGER"
-                        ? sectionEntry.dmCtg ?? p.polCtg
-                        : p.polCtg;
+                      s === "FIL"
+                        ? p.polCtg
+                        : sectionEntry.dmCtg ??
+                          (isEditable ? p.polCtg : "");
                     return (
                       <SectionCells
                         key={s}
                         section={s}
-                        editable={s === editableSection}
+                        editable={isEditable}
                         entry={sectionEntry}
                         onPatch={(patch) => onChange(p.id, s, patch)}
                         difficultyCodes={
