@@ -18,16 +18,17 @@ import "./productsReport.css";
 
 type ViewMode = "grid" | "table" | "entry";
 
+export type RateDataStatus = "idle" | "loading" | "ready" | "error";
+
 interface ProductsReportProps {
   products: Product[];
   user: Profile;
   difficultyHeaders?: string[];
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
+  rateDataStatus?: RateDataStatus;
+  onLoadRateData?: () => void;
 }
-
-const defaultViewForRole = (role: Profile["role"]): ViewMode =>
-  role === "MANAGER" ? "grid" : "entry";
 
 const inr = (n: number): string =>
   new Intl.NumberFormat("en-IN", {
@@ -41,10 +42,17 @@ export default function ProductsReport({
   difficultyHeaders,
   difficultyRates,
   polRates,
+  rateDataStatus = "idle",
+  onLoadRateData,
 }: ProductsReportProps) {
-  const [view, setView] = useState<ViewMode>(() => defaultViewForRole(user.role));
+  const [view, setView] = useState<ViewMode>("table");
   const [query, setQuery] = useState("");
   const [rateEntries, setRateEntries] = useState<RateEntries>({});
+
+  const handleOpenEntry = useCallback(() => {
+    setView("entry");
+    onLoadRateData?.();
+  }, [onLoadRateData]);
 
   const handleRateChange = useCallback(
     (productId: string, role: RateRole, patch: Partial<RateEntry>) => {
@@ -249,7 +257,7 @@ export default function ProductsReport({
             className={`products-report__view${
               view === "entry" ? " products-report__view--active" : ""
             }`}
-            onClick={() => setView("entry")}
+            onClick={handleOpenEntry}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
               <path
@@ -273,15 +281,21 @@ export default function ProductsReport({
       ) : null}
 
       {view === "entry" ? (
-        <RateEntryView
-          products={filtered}
-          user={user}
-          entries={rateEntries}
-          onChange={handleRateChange}
-          difficultyOptions={difficultyHeaders}
-          difficultyRates={difficultyRates}
-          polRates={polRates}
-        />
+        rateDataStatus === "ready" ? (
+          <RateEntryView
+            products={filtered}
+            user={user}
+            entries={rateEntries}
+            onChange={handleRateChange}
+            difficultyOptions={difficultyHeaders}
+            difficultyRates={difficultyRates}
+            polRates={polRates}
+          />
+        ) : rateDataStatus === "error" ? (
+          <RateDataError onRetry={() => onLoadRateData?.()} />
+        ) : (
+          <RateDataLoading />
+        )
       ) : filtered.length === 0 ? (
         <div className="products-report__empty">
           <p>No designs match your search.</p>
@@ -333,5 +347,39 @@ export default function ProductsReport({
         </div>
       )}
     </section>
+  );
+}
+
+function RateDataLoading() {
+  return (
+    <div className="products-report__rate-state">
+      <div className="products-report__rate-spinner" aria-hidden="true" />
+      <p className="products-report__rate-title">Loading rate data…</p>
+      <p className="products-report__rate-subtitle">
+        Fetching difficulty headers and POL rates one at a time.
+      </p>
+    </div>
+  );
+}
+
+interface RateDataErrorProps {
+  onRetry: () => void;
+}
+
+function RateDataError({ onRetry }: RateDataErrorProps) {
+  return (
+    <div className="products-report__rate-state products-report__rate-state--error">
+      <p className="products-report__rate-title">Couldn’t load rate data</p>
+      <p className="products-report__rate-subtitle">
+        The server took too long or returned an error. Try again in a moment.
+      </p>
+      <button
+        type="button"
+        className="products-report__rate-retry"
+        onClick={onRetry}
+      >
+        Retry
+      </button>
+    </div>
   );
 }

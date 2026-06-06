@@ -1,12 +1,7 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import {
-  difficulties,
-  polRates as polTypeRates,
-  prpRates as prpTypeRates,
-  dhagaRates as dhagaTypeRates,
-} from "@/constants/rate";
+import { difficulties } from "@/constants/rate";
 import ImageBox from "@/components/image-box/imageBox";
 import type { DifficultyRate, PolRate } from "@/services/api";
 import type { Product } from "@/types/product";
@@ -55,7 +50,7 @@ const sectionsForRole = (role: Role): RateRole[] => {
 const colsPerSection: Record<RateRole, number> = {
   FIL: 2,
   POL: 4,
-  MANAGER: 5,
+  MANAGER: 6,
 };
 
 const custTone = (custType: Product["custType"]): "amber" | "violet" | "emerald" | "rose" => {
@@ -85,8 +80,8 @@ export default function RateEntryView({
       : null;
 
   const localDifficultyCodes = Object.keys(difficulties);
-  const filDifficultyCodes =
-    user.role === "FIL" &&
+  const apiDifficultyCodes =
+    (user.role === "FIL" || user.role === "MANAGER") &&
     difficultyOptions &&
     difficultyOptions.length > 0
       ? difficultyOptions
@@ -221,7 +216,9 @@ export default function RateEntryView({
                   {sections.map((s) => {
                     const sectionEntry = productEntries[s] ?? {};
                     const effectiveDmCtg =
-                      s === "POL" ? sectionEntry.dmCtg ?? p.polCtg : p.polCtg;
+                      s === "POL" || s === "MANAGER"
+                        ? sectionEntry.dmCtg ?? p.polCtg
+                        : p.polCtg;
                     return (
                       <SectionCells
                         key={s}
@@ -230,7 +227,7 @@ export default function RateEntryView({
                         entry={sectionEntry}
                         onPatch={(patch) => onChange(p.id, s, patch)}
                         difficultyCodes={
-                          s === "FIL" ? filDifficultyCodes : localDifficultyCodes
+                          s === "POL" ? localDifficultyCodes : apiDifficultyCodes
                         }
                         getFilRate={buildFilRateLookup(p.custType)}
                         categoryRates={buildCategoryRates(
@@ -276,6 +273,7 @@ function renderSectionHeaders(section: RateRole) {
     <>
       <th className={className}>Difficulty</th>
       <th className={className}>FIL Rate</th>
+      <th className={className}>DmCtg</th>
       <th className={className}>POL Rate</th>
       <th className={className}>PRP Rate</th>
       <th className={className}>DHAGA Rate</th>
@@ -351,6 +349,11 @@ function SectionCells({
     );
   }
 
+  const dropdownCodes =
+    dmCtgValue && !polCategoryCodes.includes(dmCtgValue)
+      ? [dmCtgValue, ...polCategoryCodes]
+      : polCategoryCodes;
+
   return (
     <>
       <td className={tdClass}>
@@ -367,83 +370,18 @@ function SectionCells({
       <td className={`${tdClass} rate-entry__td--num`}>
         {entry.filRate !== undefined ? inr(entry.filRate) : <span className="rate-entry__placeholder">—</span>}
       </td>
-      <CombinedRateCell
-        tdClass={tdClass}
-        editable={editable}
-        options={polTypeRates as RateTable}
-        codeKey="polCode"
-        rateKey="polRate"
-        entry={entry}
-        onPatch={onPatch}
-      />
-      <CombinedRateCell
-        tdClass={tdClass}
-        editable={editable}
-        options={prpTypeRates as RateTable}
-        codeKey="prpCode"
-        rateKey="prpRate"
-        entry={entry}
-        onPatch={onPatch}
-      />
-      <CombinedRateCell
-        tdClass={tdClass}
-        editable={editable}
-        options={dhagaTypeRates as RateTable}
-        codeKey="dhagaCode"
-        rateKey="dhagaRate"
-        entry={entry}
-        onPatch={onPatch}
-      />
-    </>
-  );
-}
-
-interface CombinedRateCellProps {
-  tdClass: string;
-  editable: boolean;
-  options: RateTable;
-  codeKey: keyof RateEntry;
-  rateKey: keyof RateEntry;
-  entry: RateEntry;
-  onPatch: (patch: Partial<RateEntry>) => void;
-}
-
-function CombinedRateCell({
-  tdClass,
-  editable,
-  options,
-  codeKey,
-  rateKey,
-  entry,
-  onPatch,
-}: CombinedRateCellProps) {
-  const code = entry[codeKey] as string | undefined;
-  const rate = entry[rateKey] as number | undefined;
-
-  return (
-    <td className={tdClass}>
-      <div className="rate-entry__combo">
-        <RateDropdown
-          options={options}
-          value={code}
+      <td className={tdClass}>
+        <DifficultyDropdown
+          codes={dropdownCodes}
+          value={dmCtgValue}
           disabled={!editable}
-          onSelect={(c) => {
-            const next = c === undefined ? undefined : options[c];
-            onPatch({
-              [codeKey]: c,
-              [rateKey]: next,
-            } as Partial<RateEntry>);
-          }}
+          onSelect={(code) => onPatch({ dmCtg: code })}
         />
-        <span className="rate-entry__combo-rate">
-          {rate !== undefined ? (
-            inr(rate)
-          ) : (
-            <span className="rate-entry__placeholder">—</span>
-          )}
-        </span>
-      </div>
-    </td>
+      </td>
+      <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
+      <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
+      <DerivedRateCell tdClass={tdClass} value={categoryRates.dhagaRate} />
+    </>
   );
 }
 
@@ -495,34 +433,3 @@ function DifficultyDropdown({ codes, value, disabled, onSelect }: DifficultyDrop
   );
 }
 
-interface RateDropdownProps {
-  options: RateTable;
-  value?: string;
-  disabled?: boolean;
-  onSelect: (code: string | undefined) => void;
-}
-
-function RateDropdown({ options, value, disabled, onSelect }: RateDropdownProps) {
-  const codes = Object.keys(options);
-  if (disabled) {
-    return value ? (
-      <span className="rate-entry__readonly">{value}</span>
-    ) : (
-      <span className="rate-entry__placeholder">—</span>
-    );
-  }
-  return (
-    <select
-      className="rate-entry__select"
-      value={value ?? ""}
-      onChange={(e) => onSelect(e.target.value || undefined)}
-    >
-      <option value="">Select…</option>
-      {codes.map((c) => (
-        <option key={c} value={c}>
-          {c}
-        </option>
-      ))}
-    </select>
-  );
-}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/header/header";
 import LoginForm from "@/components/login-form/loginForm";
 import ProductsReport from "@/components/products-report/productsReport";
@@ -20,62 +20,81 @@ type LoadState =
   | { status: "success"; products: Product[] }
   | { status: "error"; message: string };
 
+export type RateDataStatus = "idle" | "loading" | "ready" | "error";
+
 export default function Home() {
   const [user, setUser] = useState<Profile | null>(null);
   const [load, setLoad] = useState<LoadState>({ status: "idle" });
   const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
   const [polRates, setPolRates] = useState<PolRate[]>([]);
+  const [rateDataStatus, setRateDataStatus] = useState<RateDataStatus>("idle");
   const [refetchKey, setRefetchKey] = useState(0);
 
+  const sessionRef = useRef(0);
+  const rateStatusRef = useRef<RateDataStatus>("idle");
+
   useEffect(() => {
+    sessionRef.current += 1;
+    rateStatusRef.current = "idle";
+    setRateDataStatus("idle");
+    setDifficultyRates([]);
+    setPolRates([]);
+
     if (!user) {
       setLoad({ status: "idle" });
-      setDifficultyRates([]);
-      setPolRates([]);
       return;
     }
 
-    let cancelled = false;
+    const session = sessionRef.current;
     setLoad({ status: "loading" });
 
     fetchDesignApprovals()
       .then((products) => {
-        if (cancelled) return;
+        if (sessionRef.current !== session) return;
         setLoad({ status: "success", products });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (sessionRef.current !== session) return;
         const message =
           err instanceof Error ? err.message : "Could not load designs.";
         setLoad({ status: "error", message });
       });
-
-    fetchDifficultyHeaders()
-      .then((rates) => {
-        if (cancelled) return;
-        setDifficultyRates(rates);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        // Non-blocking: rate-entry will fall back to local constants if this fails.
-        console.warn("Failed to load difficulty headers:", err);
-      });
-
-    fetchPolRates()
-      .then((rates) => {
-        if (cancelled) return;
-        setPolRates(rates);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        // Non-blocking: stored for later use by the POL flow.
-        console.warn("Failed to load POL rates:", err);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [user, refetchKey]);
+
+  const loadRateData = useCallback(async () => {
+    if (!user) return;
+    if (
+      rateStatusRef.current === "loading" ||
+      rateStatusRef.current === "ready"
+    ) {
+      return;
+    }
+
+    const session = sessionRef.current;
+    rateStatusRef.current = "loading";
+    setRateDataStatus("loading");
+
+    try {
+      if (user.role === "FIL" || user.role === "MANAGER") {
+        const diffs = await fetchDifficultyHeaders();
+        if (sessionRef.current !== session) return;
+        setDifficultyRates(diffs);
+      }
+      if (user.role === "POL" || user.role === "MANAGER") {
+        const pols = await fetchPolRates();
+        if (sessionRef.current !== session) return;
+        setPolRates(pols);
+      }
+      if (sessionRef.current !== session) return;
+      rateStatusRef.current = "ready";
+      setRateDataStatus("ready");
+    } catch (err) {
+      if (sessionRef.current !== session) return;
+      rateStatusRef.current = "error";
+      setRateDataStatus("error");
+      console.warn("Failed to load rate data:", err);
+    }
+  }, [user]);
 
   const difficultyHeaders = useMemo(
     () => difficultyRates.map((r) => r.code),
@@ -104,6 +123,8 @@ export default function Home() {
             difficultyHeaders={difficultyHeaders}
             difficultyRates={difficultyRates}
             polRates={polRates}
+            rateDataStatus={rateDataStatus}
+            onLoadRateData={loadRateData}
           />
         )}
       </main>

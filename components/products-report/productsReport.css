@@ -159,6 +159,78 @@
   background: #4c1d95;
 }
 
+.products-report__rate-state {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 48px 16px;
+  text-align: center;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.products-report__rate-state--error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.products-report__rate-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #e2e8f0;
+  border-top-color: #4c1d95;
+  animation: products-report-spin 0.9s linear infinite;
+}
+
+@keyframes products-report-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.products-report__rate-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: #0f172a;
+  margin: 0;
+}
+
+.products-report__rate-state--error .products-report__rate-title {
+  color: #9f1239;
+}
+
+.products-report__rate-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  max-width: 360px;
+}
+
+.products-report__rate-state--error .products-report__rate-subtitle {
+  color: #b91c1c;
+}
+
+.products-report__rate-retry {
+  border: none;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.products-report__rate-retry:hover {
+  background: #4c1d95;
+}
+
 .products-report__table-wrap {
   background: #ffffff;
   border: 1px solid #e2e8f0;
