@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "@/components/header/header";
 import LoginForm from "@/components/login-form/loginForm";
 import ProductsReport from "@/components/products-report/productsReport";
-import { fetchDesignApprovals } from "@/services/api";
+import {
+  fetchDesignApprovals,
+  fetchDifficultyHeaders,
+  type DifficultyRate,
+} from "@/services/api";
 import type { Product } from "@/types/product";
 import type { Profile } from "@/types/profile";
 
@@ -17,11 +21,13 @@ type LoadState =
 export default function Home() {
   const [user, setUser] = useState<Profile | null>(null);
   const [load, setLoad] = useState<LoadState>({ status: "idle" });
+  const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
   const [refetchKey, setRefetchKey] = useState(0);
 
   useEffect(() => {
     if (!user) {
       setLoad({ status: "idle" });
+      setDifficultyRates([]);
       return;
     }
 
@@ -40,10 +46,26 @@ export default function Home() {
         setLoad({ status: "error", message });
       });
 
+    fetchDifficultyHeaders()
+      .then((rates) => {
+        if (cancelled) return;
+        setDifficultyRates(rates);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Non-blocking: rate-entry will fall back to local constants if this fails.
+        console.warn("Failed to load difficulty headers:", err);
+      });
+
     return () => {
       cancelled = true;
     };
   }, [user, refetchKey]);
+
+  const difficultyHeaders = useMemo(
+    () => difficultyRates.map((r) => r.code),
+    [difficultyRates]
+  );
 
   const handleLogout = useCallback(() => setUser(null), []);
   const handleRetry = useCallback(() => setRefetchKey((k) => k + 1), []);
@@ -61,7 +83,12 @@ export default function Home() {
         ) : load.status === "error" ? (
           <ErrorState message={load.message} onRetry={handleRetry} />
         ) : (
-          <ProductsReport products={load.products} user={user} />
+          <ProductsReport
+            products={load.products}
+            user={user}
+            difficultyHeaders={difficultyHeaders}
+            difficultyRates={difficultyRates}
+          />
         )}
       </main>
     </>

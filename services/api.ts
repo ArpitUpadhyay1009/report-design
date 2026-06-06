@@ -93,3 +93,48 @@ export async function fetchDesignApprovals(): Promise<Product[]> {
   const rows = response.data?.data ?? [];
   return rows.map(mapRow);
 }
+
+export interface DifficultyRate {
+  code: string;
+  normalRate: number | null;
+  brandRate: number | null;
+}
+
+interface DifficultyHeaderRow {
+  Difficulty: string | null;
+  NormalRate: string | null;
+  BrandRate: string | null;
+}
+
+interface DifficultyHeadersResponse {
+  status: string;
+  data: DifficultyHeaderRow[];
+  total?: number;
+  message?: string;
+}
+
+const parseNullableRate = (v: string | null | undefined): number | null => {
+  if (v === null || v === undefined) return null;
+  const trimmed = v.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+};
+
+export async function fetchDifficultyHeaders(): Promise<DifficultyRate[]> {
+  const response = await apiClient.post<DifficultyHeadersResponse>(
+    "/get-Difficulty-Headers"
+  );
+  const list = response.data?.data ?? [];
+  return list
+    .map<DifficultyRate | null>((row) => {
+      const code = (row?.Difficulty ?? "").trim();
+      if (!code) return null;
+      return {
+        code,
+        normalRate: parseNullableRate(row?.NormalRate),
+        brandRate: parseNullableRate(row?.BrandRate),
+      };
+    })
+    .filter((r): r is DifficultyRate => r !== null);
+}

@@ -5,6 +5,7 @@ import ProductCard from "@/components/product-card/productCard";
 import ProductRow from "@/components/product-row/productRow";
 import RateEntryView from "@/components/rate-entry-view/rateEntryView";
 import StatCard from "@/components/stat-card/statCard";
+import type { DifficultyRate } from "@/services/api";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import type { Profile } from "@/types/profile";
@@ -20,6 +21,8 @@ type ViewMode = "grid" | "table" | "entry";
 interface ProductsReportProps {
   products: Product[];
   user: Profile;
+  difficultyHeaders?: string[];
+  difficultyRates?: DifficultyRate[];
 }
 
 const defaultViewForRole = (role: Profile["role"]): ViewMode =>
@@ -31,7 +34,12 @@ const inr = (n: number): string =>
     maximumFractionDigits: 2,
   }).format(n);
 
-export default function ProductsReport({ products, user }: ProductsReportProps) {
+export default function ProductsReport({
+  products,
+  user,
+  difficultyHeaders,
+  difficultyRates,
+}: ProductsReportProps) {
   const [view, setView] = useState<ViewMode>(() => defaultViewForRole(user.role));
   const [query, setQuery] = useState("");
   const [rateEntries, setRateEntries] = useState<RateEntries>({});
@@ -268,6 +276,8 @@ export default function ProductsReport({ products, user }: ProductsReportProps) 
           user={user}
           entries={rateEntries}
           onChange={handleRateChange}
+          difficultyOptions={difficultyHeaders}
+          difficultyRates={difficultyRates}
         />
       ) : filtered.length === 0 ? (
         <div className="products-report__empty">

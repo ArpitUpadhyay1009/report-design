@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import {
   difficulties,
   polRates,
@@ -8,18 +8,22 @@ import {
   dhagaRates,
 } from "@/constants/rate";
 import ImageBox from "@/components/image-box/imageBox";
+import type { DifficultyRate } from "@/services/api";
 import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
 import type { RateEntry, RateEntries, RateRole } from "@/types/rateEntry";
 import "./rateEntryView.css";
 
 type RateTable = Record<string, number>;
+type FilRateLookup = (code: string) => number | undefined;
 
 interface RateEntryViewProps {
   products: Product[];
   user: Profile;
   entries: RateEntries;
   onChange: (productId: string, role: RateRole, patch: Partial<RateEntry>) => void;
+  difficultyOptions?: string[];
+  difficultyRates?: DifficultyRate[];
 }
 
 const inr = (n: number): string =>
@@ -59,6 +63,8 @@ export default function RateEntryView({
   user,
   entries,
   onChange,
+  difficultyOptions,
+  difficultyRates,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
   const editableSection: RateRole | null =
@@ -69,6 +75,33 @@ export default function RateEntryView({
       : user.role === "MANAGER"
       ? "MANAGER"
       : null;
+
+  const localDifficultyCodes = Object.keys(difficulties);
+  const filDifficultyCodes =
+    user.role === "FIL" &&
+    difficultyOptions &&
+    difficultyOptions.length > 0
+      ? difficultyOptions
+      : localDifficultyCodes;
+
+  const ratesByCode = useMemo(() => {
+    const map = new Map<string, DifficultyRate>();
+    (difficultyRates ?? []).forEach((r) => map.set(r.code, r));
+    return map;
+  }, [difficultyRates]);
+
+  const buildFilRateLookup = (custType: string): FilRateLookup => {
+    return (code: string): number | undefined => {
+      const apiEntry = ratesByCode.get(code);
+      if (apiEntry) {
+        if (custType === "O") return apiEntry.normalRate ?? undefined;
+        if (custType === "B") return apiEntry.brandRate ?? undefined;
+        return undefined;
+      }
+      const localRate = (difficulties as RateTable)[code];
+      return localRate;
+    };
+  };
 
   return (
     <div className="rate-entry">
@@ -150,6 +183,10 @@ export default function RateEntryView({
                       editable={s === editableSection}
                       entry={productEntries[s] ?? {}}
                       onPatch={(patch) => onChange(p.id, s, patch)}
+                      difficultyCodes={
+                        s === "FIL" ? filDifficultyCodes : localDifficultyCodes
+                      }
+                      getFilRate={buildFilRateLookup(p.custType)}
                     />
                   ))}
                 </tr>
@@ -198,9 +235,18 @@ interface SectionCellsProps {
   editable: boolean;
   entry: RateEntry;
   onPatch: (patch: Partial<RateEntry>) => void;
+  difficultyCodes: string[];
+  getFilRate: FilRateLookup;
 }
 
-function SectionCells({ section, editable, entry, onPatch }: SectionCellsProps) {
+function SectionCells({
+  section,
+  editable,
+  entry,
+  onPatch,
+  difficultyCodes,
+  getFilRate,
+}: SectionCellsProps) {
   const tdClass = `rate-entry__td rate-entry__td--${section.toLowerCase()}`;
 
   if (section === "FIL") {
@@ -208,13 +254,11 @@ function SectionCells({ section, editable, entry, onPatch }: SectionCellsProps) 
       <>
         <td className={tdClass}>
           <DifficultyDropdown
+            codes={difficultyCodes}
             value={entry.difficulty}
             disabled={!editable}
             onSelect={(code) => {
-              const filRate =
-                code === undefined
-                  ? undefined
-                  : (difficulties as RateTable)[code];
+              const filRate = code === undefined ? undefined : getFilRate(code);
               onPatch({ difficulty: code, filRate });
             }}
           />
@@ -231,6 +275,7 @@ function SectionCells({ section, editable, entry, onPatch }: SectionCellsProps) 
       <>
         <td className={tdClass}>
           <DifficultyDropdown
+            codes={difficultyCodes}
             value={entry.difficulty}
             disabled={!editable}
             onSelect={(code) => onPatch({ difficulty: code })}
@@ -271,13 +316,11 @@ function SectionCells({ section, editable, entry, onPatch }: SectionCellsProps) 
     <>
       <td className={tdClass}>
         <DifficultyDropdown
+          codes={difficultyCodes}
           value={entry.difficulty}
           disabled={!editable}
           onSelect={(code) => {
-            const filRate =
-              code === undefined
-                ? undefined
-                : (difficulties as RateTable)[code];
+            const filRate = code === undefined ? undefined : getFilRate(code);
             onPatch({ difficulty: code, filRate });
           }}
         />
@@ -366,13 +409,13 @@ function CombinedRateCell({
 }
 
 interface DifficultyDropdownProps {
+  codes: string[];
   value?: string;
   disabled?: boolean;
   onSelect: (code: string | undefined) => void;
 }
 
-function DifficultyDropdown({ value, disabled, onSelect }: DifficultyDropdownProps) {
-  const codes = Object.keys(difficulties);
+function DifficultyDropdown({ codes, value, disabled, onSelect }: DifficultyDropdownProps) {
   if (disabled) {
     return value ? (
       <span className="rate-entry__readonly">{value}</span>
