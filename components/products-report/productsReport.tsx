@@ -5,7 +5,7 @@ import ProductCard from "@/components/product-card/productCard";
 import ProductRow from "@/components/product-row/productRow";
 import RateEntryView from "@/components/rate-entry-view/rateEntryView";
 import StatCard from "@/components/stat-card/statCard";
-import type { DifficultyRate } from "@/services/api";
+import type { DifficultyRate, PolRate } from "@/services/api";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import type { Profile } from "@/types/profile";
@@ -23,6 +23,7 @@ interface ProductsReportProps {
   user: Profile;
   difficultyHeaders?: string[];
   difficultyRates?: DifficultyRate[];
+  polRates?: PolRate[];
 }
 
 const defaultViewForRole = (role: Profile["role"]): ViewMode =>
@@ -39,6 +40,7 @@ export default function ProductsReport({
   user,
   difficultyHeaders,
   difficultyRates,
+  polRates,
 }: ProductsReportProps) {
   const [view, setView] = useState<ViewMode>(() => defaultViewForRole(user.role));
   const [query, setQuery] = useState("");
@@ -278,6 +280,7 @@ export default function ProductsReport({
           onChange={handleRateChange}
           difficultyOptions={difficultyHeaders}
           difficultyRates={difficultyRates}
+          polRates={polRates}
         />
       ) : filtered.length === 0 ? (
         <div className="products-report__empty">

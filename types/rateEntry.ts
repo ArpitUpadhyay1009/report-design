@@ -3,6 +3,7 @@ export type RateRole = "FIL" | "POL" | "MANAGER";
 export interface RateEntry {
   difficulty?: string;
   filRate?: number;
+  dmCtg?: string;
   polCode?: string;
   polRate?: number;
   prpCode?: string;

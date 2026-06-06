@@ -3,12 +3,12 @@
 import { Fragment, useMemo } from "react";
 import {
   difficulties,
-  polRates,
-  prpRates,
-  dhagaRates,
+  polRates as polTypeRates,
+  prpRates as prpTypeRates,
+  dhagaRates as dhagaTypeRates,
 } from "@/constants/rate";
 import ImageBox from "@/components/image-box/imageBox";
-import type { DifficultyRate } from "@/services/api";
+import type { DifficultyRate, PolRate } from "@/services/api";
 import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
 import type { RateEntry, RateEntries, RateRole } from "@/types/rateEntry";
@@ -17,6 +17,12 @@ import "./rateEntryView.css";
 type RateTable = Record<string, number>;
 type FilRateLookup = (code: string) => number | undefined;
 
+interface CategoryRates {
+  polRate?: number;
+  prpRate?: number;
+  dhagaRate?: number;
+}
+
 interface RateEntryViewProps {
   products: Product[];
   user: Profile;
@@ -24,6 +30,7 @@ interface RateEntryViewProps {
   onChange: (productId: string, role: RateRole, patch: Partial<RateEntry>) => void;
   difficultyOptions?: string[];
   difficultyRates?: DifficultyRate[];
+  polRates?: PolRate[];
 }
 
 const inr = (n: number): string =>
@@ -65,6 +72,7 @@ export default function RateEntryView({
   onChange,
   difficultyOptions,
   difficultyRates,
+  polRates,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
   const editableSection: RateRole | null =
@@ -90,6 +98,17 @@ export default function RateEntryView({
     return map;
   }, [difficultyRates]);
 
+  const polRatesByCategory = useMemo(() => {
+    const map = new Map<string, PolRate>();
+    (polRates ?? []).forEach((r) => map.set(r.category, r));
+    return map;
+  }, [polRates]);
+
+  const polCategoryCodes = useMemo(() => {
+    const codes = (polRates ?? []).map((r) => r.category).filter(Boolean);
+    return Array.from(new Set(codes)).sort();
+  }, [polRates]);
+
   const buildFilRateLookup = (custType: string): FilRateLookup => {
     return (code: string): number | undefined => {
       const apiEntry = ratesByCode.get(code);
@@ -101,6 +120,29 @@ export default function RateEntryView({
       const localRate = (difficulties as RateTable)[code];
       return localRate;
     };
+  };
+
+  const buildCategoryRates = (
+    polCtg: string,
+    custType: string
+  ): CategoryRates => {
+    const entry = polRatesByCategory.get(polCtg);
+    if (!entry) return {};
+    if (custType === "O") {
+      return {
+        polRate: entry.normalPol ?? undefined,
+        prpRate: entry.normalPrp ?? undefined,
+        dhagaRate: entry.normalDhaga ?? undefined,
+      };
+    }
+    if (custType === "B") {
+      return {
+        polRate: entry.brandPol ?? undefined,
+        prpRate: entry.brandPrp ?? undefined,
+        dhagaRate: entry.brandDhaga ?? undefined,
+      };
+    }
+    return {};
   };
 
   return (
@@ -176,19 +218,30 @@ export default function RateEntryView({
                   <td className="rate-entry__td">
                     <div className="rate-entry__manager">{p.managerShort}</div>
                   </td>
-                  {sections.map((s) => (
-                    <SectionCells
-                      key={s}
-                      section={s}
-                      editable={s === editableSection}
-                      entry={productEntries[s] ?? {}}
-                      onPatch={(patch) => onChange(p.id, s, patch)}
-                      difficultyCodes={
-                        s === "FIL" ? filDifficultyCodes : localDifficultyCodes
-                      }
-                      getFilRate={buildFilRateLookup(p.custType)}
-                    />
-                  ))}
+                  {sections.map((s) => {
+                    const sectionEntry = productEntries[s] ?? {};
+                    const effectiveDmCtg =
+                      s === "POL" ? sectionEntry.dmCtg ?? p.polCtg : p.polCtg;
+                    return (
+                      <SectionCells
+                        key={s}
+                        section={s}
+                        editable={s === editableSection}
+                        entry={sectionEntry}
+                        onPatch={(patch) => onChange(p.id, s, patch)}
+                        difficultyCodes={
+                          s === "FIL" ? filDifficultyCodes : localDifficultyCodes
+                        }
+                        getFilRate={buildFilRateLookup(p.custType)}
+                        categoryRates={buildCategoryRates(
+                          effectiveDmCtg,
+                          p.custType
+                        )}
+                        polCategoryCodes={polCategoryCodes}
+                        dmCtgValue={effectiveDmCtg}
+                      />
+                    );
+                  })}
                 </tr>
               );
             })}
@@ -212,7 +265,7 @@ function renderSectionHeaders(section: RateRole) {
   if (section === "POL") {
     return (
       <>
-        <th className={className}>Difficulty</th>
+        <th className={className}>DmCtg</th>
         <th className={className}>POL Rate</th>
         <th className={className}>PRP Rate</th>
         <th className={className}>DHAGA Rate</th>
@@ -237,6 +290,9 @@ interface SectionCellsProps {
   onPatch: (patch: Partial<RateEntry>) => void;
   difficultyCodes: string[];
   getFilRate: FilRateLookup;
+  categoryRates: CategoryRates;
+  polCategoryCodes: string[];
+  dmCtgValue: string;
 }
 
 function SectionCells({
@@ -246,6 +302,9 @@ function SectionCells({
   onPatch,
   difficultyCodes,
   getFilRate,
+  categoryRates,
+  polCategoryCodes,
+  dmCtgValue,
 }: SectionCellsProps) {
   const tdClass = `rate-entry__td rate-entry__td--${section.toLowerCase()}`;
 
@@ -271,43 +330,23 @@ function SectionCells({
   }
 
   if (section === "POL") {
+    const dropdownCodes =
+      dmCtgValue && !polCategoryCodes.includes(dmCtgValue)
+        ? [dmCtgValue, ...polCategoryCodes]
+        : polCategoryCodes;
     return (
       <>
         <td className={tdClass}>
           <DifficultyDropdown
-            codes={difficultyCodes}
-            value={entry.difficulty}
+            codes={dropdownCodes}
+            value={dmCtgValue}
             disabled={!editable}
-            onSelect={(code) => onPatch({ difficulty: code })}
+            onSelect={(code) => onPatch({ dmCtg: code })}
           />
         </td>
-        <CombinedRateCell
-          tdClass={tdClass}
-          editable={editable}
-          options={polRates as RateTable}
-          codeKey="polCode"
-          rateKey="polRate"
-          entry={entry}
-          onPatch={onPatch}
-        />
-        <CombinedRateCell
-          tdClass={tdClass}
-          editable={editable}
-          options={prpRates as RateTable}
-          codeKey="prpCode"
-          rateKey="prpRate"
-          entry={entry}
-          onPatch={onPatch}
-        />
-        <CombinedRateCell
-          tdClass={tdClass}
-          editable={editable}
-          options={dhagaRates as RateTable}
-          codeKey="dhagaCode"
-          rateKey="dhagaRate"
-          entry={entry}
-          onPatch={onPatch}
-        />
+        <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
+        <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
+        <DerivedRateCell tdClass={tdClass} value={categoryRates.dhagaRate} />
       </>
     );
   }
@@ -331,7 +370,7 @@ function SectionCells({
       <CombinedRateCell
         tdClass={tdClass}
         editable={editable}
-        options={polRates as RateTable}
+        options={polTypeRates as RateTable}
         codeKey="polCode"
         rateKey="polRate"
         entry={entry}
@@ -340,7 +379,7 @@ function SectionCells({
       <CombinedRateCell
         tdClass={tdClass}
         editable={editable}
-        options={prpRates as RateTable}
+        options={prpTypeRates as RateTable}
         codeKey="prpCode"
         rateKey="prpRate"
         entry={entry}
@@ -349,7 +388,7 @@ function SectionCells({
       <CombinedRateCell
         tdClass={tdClass}
         editable={editable}
-        options={dhagaRates as RateTable}
+        options={dhagaTypeRates as RateTable}
         codeKey="dhagaCode"
         rateKey="dhagaRate"
         entry={entry}
@@ -404,6 +443,23 @@ function CombinedRateCell({
           )}
         </span>
       </div>
+    </td>
+  );
+}
+
+interface DerivedRateCellProps {
+  tdClass: string;
+  value: number | undefined;
+}
+
+function DerivedRateCell({ tdClass, value }: DerivedRateCellProps) {
+  return (
+    <td className={`${tdClass} rate-entry__td--num`}>
+      {value !== undefined ? (
+        inr(value)
+      ) : (
+        <span className="rate-entry__placeholder">—</span>
+      )}
     </td>
   );
 }

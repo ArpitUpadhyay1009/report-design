@@ -7,7 +7,9 @@ import ProductsReport from "@/components/products-report/productsReport";
 import {
   fetchDesignApprovals,
   fetchDifficultyHeaders,
+  fetchPolRates,
   type DifficultyRate,
+  type PolRate,
 } from "@/services/api";
 import type { Product } from "@/types/product";
 import type { Profile } from "@/types/profile";
@@ -22,12 +24,14 @@ export default function Home() {
   const [user, setUser] = useState<Profile | null>(null);
   const [load, setLoad] = useState<LoadState>({ status: "idle" });
   const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
+  const [polRates, setPolRates] = useState<PolRate[]>([]);
   const [refetchKey, setRefetchKey] = useState(0);
 
   useEffect(() => {
     if (!user) {
       setLoad({ status: "idle" });
       setDifficultyRates([]);
+      setPolRates([]);
       return;
     }
 
@@ -55,6 +59,17 @@ export default function Home() {
         if (cancelled) return;
         // Non-blocking: rate-entry will fall back to local constants if this fails.
         console.warn("Failed to load difficulty headers:", err);
+      });
+
+    fetchPolRates()
+      .then((rates) => {
+        if (cancelled) return;
+        setPolRates(rates);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Non-blocking: stored for later use by the POL flow.
+        console.warn("Failed to load POL rates:", err);
       });
 
     return () => {
@@ -88,6 +103,7 @@ export default function Home() {
             user={user}
             difficultyHeaders={difficultyHeaders}
             difficultyRates={difficultyRates}
+            polRates={polRates}
           />
         )}
       </main>

@@ -138,3 +138,50 @@ export async function fetchDifficultyHeaders(): Promise<DifficultyRate[]> {
     })
     .filter((r): r is DifficultyRate => r !== null);
 }
+
+export interface PolRate {
+  category: string;
+  normalPol: number | null;
+  normalPrp: number | null;
+  normalDhaga: number | null;
+  brandPol: number | null;
+  brandPrp: number | null;
+  brandDhaga: number | null;
+}
+
+interface PolRateRow {
+  DmCtg: string | null;
+  Normal_Pol: string | null;
+  Normal_Prp: string | null;
+  Normal_Dhaga: string | null;
+  Brand_Pol: string | null;
+  Brand_Prp: string | null;
+  Brand_Dhaga: string | null;
+}
+
+interface PolRatesResponse {
+  status: string;
+  data: PolRateRow[];
+  total?: number;
+  message?: string;
+}
+
+export async function fetchPolRates(): Promise<PolRate[]> {
+  const response = await apiClient.post<PolRatesResponse>("/get-Pol-Rates");
+  const list = response.data?.data ?? [];
+  return list
+    .map<PolRate | null>((row) => {
+      const category = (row?.DmCtg ?? "").trim();
+      if (!category) return null;
+      return {
+        category,
+        normalPol: parseNullableRate(row?.Normal_Pol),
+        normalPrp: parseNullableRate(row?.Normal_Prp),
+        normalDhaga: parseNullableRate(row?.Normal_Dhaga),
+        brandPol: parseNullableRate(row?.Brand_Pol),
+        brandPrp: parseNullableRate(row?.Brand_Prp),
+        brandDhaga: parseNullableRate(row?.Brand_Dhaga),
+      };
+    })
+    .filter((r): r is PolRate => r !== null);
+}
