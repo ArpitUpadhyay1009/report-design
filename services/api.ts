@@ -185,3 +185,204 @@ export async function fetchPolRates(): Promise<PolRate[]> {
     })
     .filter((r): r is PolRate => r !== null);
 }
+
+export interface FilRatePayload {
+  user_id: string;
+  design_id: string;
+  difficulty: string;
+  fil_rate: number;
+}
+
+export interface FilRateResponse {
+  status: string;
+  action?: string;
+  data?: unknown;
+  message: string | string[];
+}
+
+export async function submitFilRate(
+  payload: FilRatePayload
+): Promise<FilRateResponse> {
+  // The CodeIgniter controller reads via $this->input->post(...), which
+  // expects application/x-www-form-urlencoded.
+  const body = new URLSearchParams();
+  body.append("user_id", payload.user_id);
+  body.append("design_id", payload.design_id);
+  body.append("difficulty", payload.difficulty);
+  body.append("fil_rate", String(payload.fil_rate));
+
+  const response = await apiClient.post<FilRateResponse>(
+    "/add-FIL-Rate",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  return response.data;
+}
+
+export interface PolRatePayload {
+  user_id: string;
+  design_id: string;
+  pol_rate: number;
+  prp_rate: number;
+  dhaga_rate: number;
+}
+
+export interface PolRateResponse {
+  status: string;
+  action?: string;
+  data?: unknown;
+  message: string | string[];
+}
+
+export async function submitPolRate(
+  payload: PolRatePayload
+): Promise<PolRateResponse> {
+  const body = new URLSearchParams();
+  body.append("user_id", payload.user_id);
+  body.append("design_id", payload.design_id);
+  body.append("pol_rate", String(payload.pol_rate));
+  body.append("prp_rate", String(payload.prp_rate));
+  body.append("dhaga_rate", String(payload.dhaga_rate));
+
+  const response = await apiClient.post<PolRateResponse>(
+    "/add-POL-Rate",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  return response.data;
+}
+
+export interface ManagerRatePayload {
+  user_id: string;
+  design_id: string;
+  difficulty: string;
+  manager_fil_rate: number;
+  manager_pol_rate: number;
+  manager_prp_rate: number;
+  manager_dhaga_rate: number;
+}
+
+export interface ManagerRateResponse {
+  status: string;
+  action?: string;
+  data?: unknown;
+  message: string | string[];
+}
+
+export async function submitManagerRate(
+  payload: ManagerRatePayload
+): Promise<ManagerRateResponse> {
+  const body = new URLSearchParams();
+  body.append("user_id", payload.user_id);
+  body.append("design_id", payload.design_id);
+  body.append("difficulty", payload.difficulty);
+  body.append("manager_fil_rate", String(payload.manager_fil_rate));
+  body.append("manager_pol_rate", String(payload.manager_pol_rate));
+  body.append("manager_prp_rate", String(payload.manager_prp_rate));
+  body.append("manager_dhaga_rate", String(payload.manager_dhaga_rate));
+
+  const response = await apiClient.post<ManagerRateResponse>(
+    "/add-Manager-Rate",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  return response.data;
+}
+
+export interface SubmittedFilRate {
+  designId: string;
+  difficulty: string;
+  filRate: number;
+  filSubmittedAt?: string;
+}
+
+export interface SubmittedPolRate {
+  designId: string;
+  polRate: number;
+  prpRate: number;
+  dhagaRate: number;
+  polSubmittedAt?: string;
+}
+
+interface SubmittedRateRow {
+  design_id: string | null;
+  difficulty: string | null;
+  fil_rate: string | null;
+  fil_submitted_at: string | null;
+  pol_rate: string | null;
+  prp_rate: string | null;
+  dhaga_rate: string | null;
+  pol_submitted_at: string | null;
+}
+
+interface SubmittedRatesResponse {
+  status: string;
+  data: SubmittedRateRow[];
+  total?: number;
+  message?: string;
+}
+
+export async function fetchFilRatesByUser(
+  userId: string
+): Promise<SubmittedFilRate[]> {
+  const body = new URLSearchParams();
+  body.append("user_id", userId);
+
+  const response = await apiClient.post<SubmittedRatesResponse>(
+    "/get-FIL-Rates-By-User",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  const list = response.data?.data ?? [];
+  return list
+    .map<SubmittedFilRate | null>((row) => {
+      const designId = (row?.design_id ?? "").trim();
+      const difficulty = (row?.difficulty ?? "").trim();
+      const filRate = parseNullableRate(row?.fil_rate);
+      if (!designId || !difficulty || filRate === null) return null;
+      return {
+        designId,
+        difficulty,
+        filRate,
+        filSubmittedAt: row?.fil_submitted_at ?? undefined,
+      };
+    })
+    .filter((r): r is SubmittedFilRate => r !== null);
+}
+
+export async function fetchPolRatesByUser(
+  userId: string
+): Promise<SubmittedPolRate[]> {
+  const body = new URLSearchParams();
+  body.append("user_id", userId);
+
+  const response = await apiClient.post<SubmittedRatesResponse>(
+    "/get-POL-Rates-By-User",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  const list = response.data?.data ?? [];
+  return list
+    .map<SubmittedPolRate | null>((row) => {
+      const designId = (row?.design_id ?? "").trim();
+      const polRate = parseNullableRate(row?.pol_rate);
+      const prpRate = parseNullableRate(row?.prp_rate);
+      const dhagaRate = parseNullableRate(row?.dhaga_rate);
+      if (
+        !designId ||
+        polRate === null ||
+        prpRate === null ||
+        dhagaRate === null
+      ) {
+        return null;
+      }
+      return {
+        designId,
+        polRate,
+        prpRate,
+        dhagaRate,
+        polSubmittedAt: row?.pol_submitted_at ?? undefined,
+      };
+    })
+    .filter((r): r is SubmittedPolRate => r !== null);
+}

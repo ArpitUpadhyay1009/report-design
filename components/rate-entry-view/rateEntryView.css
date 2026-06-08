@@ -220,10 +220,62 @@
   white-space: nowrap;
 }
 
+.rate-entry__design-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .rate-entry__design {
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: #0f172a;
+}
+
+.rate-entry__row--submitting {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.rate-entry__row--done {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.rate-entry__row--error {
+  background: rgba(244, 63, 94, 0.07);
+}
+
+.rate-entry__row-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.rate-entry__row-badge--submitting {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.rate-entry__row-badge--done {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.rate-entry__row-badge--error {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+  cursor: help;
 }
 
 .rate-entry__sub {
@@ -304,4 +356,70 @@
   font-size: 12px;
   color: #0f172a;
   white-space: nowrap;
+}
+
+.rate-entry__submit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+
+.rate-entry__submit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.rate-entry__submit-hint strong {
+  color: #0f172a;
+}
+
+.rate-entry__submit-summary {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rate-entry__submit-summary--ok {
+  color: #047857;
+}
+
+.rate-entry__submit-summary--mixed {
+  color: #b45309;
+}
+
+.rate-entry__submit-btn {
+  border: none;
+  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 80ms ease, opacity 120ms ease, filter 120ms ease;
+  box-shadow: 0 6px 16px rgba(76, 29, 149, 0.18);
+}
+
+.rate-entry__submit-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.rate-entry__submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.rate-entry__submit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }

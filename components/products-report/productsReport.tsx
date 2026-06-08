@@ -5,7 +5,12 @@ import ProductCard from "@/components/product-card/productCard";
 import ProductRow from "@/components/product-row/productRow";
 import RateEntryView from "@/components/rate-entry-view/rateEntryView";
 import StatCard from "@/components/stat-card/statCard";
-import type { DifficultyRate, PolRate } from "@/services/api";
+import type {
+  DifficultyRate,
+  PolRate,
+  SubmittedFilRate,
+  SubmittedPolRate,
+} from "@/services/api";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import type { Profile } from "@/types/profile";
@@ -26,6 +31,8 @@ interface ProductsReportProps {
   difficultyHeaders?: string[];
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
+  submittedFilRates?: SubmittedFilRate[];
+  submittedPolRates?: SubmittedPolRate[];
   rateDataStatus?: RateDataStatus;
   onLoadRateData?: () => void;
 }
@@ -42,6 +49,8 @@ export default function ProductsReport({
   difficultyHeaders,
   difficultyRates,
   polRates,
+  submittedFilRates,
+  submittedPolRates,
   rateDataStatus = "idle",
   onLoadRateData,
 }: ProductsReportProps) {
@@ -290,6 +299,8 @@ export default function ProductsReport({
             difficultyOptions={difficultyHeaders}
             difficultyRates={difficultyRates}
             polRates={polRates}
+            submittedFilRates={submittedFilRates}
+            submittedPolRates={submittedPolRates}
           />
         ) : rateDataStatus === "error" ? (
           <RateDataError onRetry={() => onLoadRateData?.()} />

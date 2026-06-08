@@ -1,9 +1,20 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { difficulties } from "@/constants/rate";
 import ImageBox from "@/components/image-box/imageBox";
-import type { DifficultyRate, PolRate } from "@/services/api";
+import {
+  submitFilRate,
+  submitManagerRate,
+  submitPolRate,
+  type DifficultyRate,
+  type FilRateResponse,
+  type ManagerRateResponse,
+  type PolRate,
+  type PolRateResponse,
+  type SubmittedFilRate,
+  type SubmittedPolRate,
+} from "@/services/api";
 import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
 import type { RateEntry, RateEntries, RateRole } from "@/types/rateEntry";
@@ -11,6 +22,13 @@ import "./rateEntryView.css";
 
 type RateTable = Record<string, number>;
 type FilRateLookup = (code: string) => number | undefined;
+type RowSubmitState = "submitting" | "done" | "error";
+
+interface SubmitSummary {
+  total: number;
+  done: number;
+  failed: number;
+}
 
 interface CategoryRates {
   polRate?: number;
@@ -26,6 +44,8 @@ interface RateEntryViewProps {
   difficultyOptions?: string[];
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
+  submittedFilRates?: SubmittedFilRate[];
+  submittedPolRates?: SubmittedPolRate[];
 }
 
 const inr = (n: number): string =>
@@ -68,6 +88,8 @@ export default function RateEntryView({
   difficultyOptions,
   difficultyRates,
   polRates,
+  submittedFilRates,
+  submittedPolRates,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
   const editableSection: RateRole | null =
@@ -104,6 +126,20 @@ export default function RateEntryView({
     return Array.from(new Set(codes)).sort();
   }, [polRates]);
 
+  // Manager-only: design-id -> submitted FIL/POL row, used to fill the
+  // read-only FIL Entry / POL Entry sections.
+  const submittedFilByDesign = useMemo(() => {
+    const map = new Map<string, SubmittedFilRate>();
+    (submittedFilRates ?? []).forEach((r) => map.set(r.designId, r));
+    return map;
+  }, [submittedFilRates]);
+
+  const submittedPolByDesign = useMemo(() => {
+    const map = new Map<string, SubmittedPolRate>();
+    (submittedPolRates ?? []).forEach((r) => map.set(r.designId, r));
+    return map;
+  }, [submittedPolRates]);
+
   const buildFilRateLookup = (custType: string): FilRateLookup => {
     return (code: string): number | undefined => {
       const apiEntry = ratesByCode.get(code);
@@ -139,6 +175,219 @@ export default function RateEntryView({
     }
     return {};
   };
+
+  const [submitting, setSubmitting] = useState(false);
+  const [rowStatuses, setRowStatuses] = useState<
+    Record<string, RowSubmitState>
+  >({});
+  const [rowMessages, setRowMessages] = useState<Record<string, string>>({});
+  const [submitSummary, setSubmitSummary] = useState<SubmitSummary | null>(
+    null
+  );
+
+  const submittableProducts = useMemo(() => {
+    if (user.role === "FIL") {
+      return products.filter((p) => {
+        const e = entries[p.id]?.FIL;
+        return (
+          !!e &&
+          typeof e.difficulty === "string" &&
+          e.difficulty.length > 0 &&
+          typeof e.filRate === "number" &&
+          Number.isFinite(e.filRate)
+        );
+      });
+    }
+    if (user.role === "POL") {
+      return products.filter((p) => {
+        const sectionEntry = entries[p.id]?.POL ?? {};
+        const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
+        if (!effectiveDmCtg) return false;
+        const polEntry = polRatesByCategory.get(effectiveDmCtg);
+        if (!polEntry) return false;
+        const isO = p.custType === "O";
+        const isB = p.custType === "B";
+        if (!isO && !isB) return false;
+        const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
+        const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
+        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
+        return (
+          typeof polRate === "number" &&
+          typeof prpRate === "number" &&
+          typeof dhagaRate === "number"
+        );
+      });
+    }
+    if (user.role === "MANAGER") {
+      return products.filter((p) => {
+        const sectionEntry = entries[p.id]?.MANAGER ?? {};
+        // Manager must have picked a difficulty (which auto-fills filRate via
+        // the FIL-rate lookup; we still guard both fields).
+        if (
+          typeof sectionEntry.difficulty !== "string" ||
+          sectionEntry.difficulty.length === 0 ||
+          typeof sectionEntry.filRate !== "number" ||
+          !Number.isFinite(sectionEntry.filRate)
+        ) {
+          return false;
+        }
+        // POL/PRP/DHAGA come from polCtg (or manager's DmCtg override) ×
+        // custType, exactly like the POL section.
+        const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
+        if (!effectiveDmCtg) return false;
+        const polEntry = polRatesByCategory.get(effectiveDmCtg);
+        if (!polEntry) return false;
+        const isO = p.custType === "O";
+        const isB = p.custType === "B";
+        if (!isO && !isB) return false;
+        const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
+        const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
+        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
+        return (
+          typeof polRate === "number" &&
+          typeof prpRate === "number" &&
+          typeof dhagaRate === "number"
+        );
+      });
+    }
+    return [] as Product[];
+  }, [user.role, products, entries, polRatesByCategory]);
+
+  const handleSubmit = useCallback(async () => {
+    if (submitting || submittableProducts.length === 0) return;
+    if (!user.userId) {
+      console.warn("Cannot submit rates without a user id.");
+      return;
+    }
+
+    // Snapshot per-row API calls at click time so a mid-submit edit can't
+    // change what's in flight. Each job is a productId + a thunk that
+    // resolves to the server response.
+    type Job = {
+      productId: string;
+      run: () => Promise<
+        FilRateResponse | PolRateResponse | ManagerRateResponse
+      >;
+    };
+
+    let jobs: Job[] = [];
+
+    if (user.role === "FIL") {
+      jobs = submittableProducts.map((p) => {
+        const e = entries[p.id]!.FIL!;
+        const payload = {
+          user_id: user.userId,
+          design_id: p.designCode,
+          difficulty: e.difficulty as string,
+          fil_rate: e.filRate as number,
+        };
+        return { productId: p.id, run: () => submitFilRate(payload) };
+      });
+    } else if (user.role === "POL") {
+      jobs = submittableProducts.map((p) => {
+        const sectionEntry = entries[p.id]?.POL ?? {};
+        const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
+        const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
+        const isO = p.custType === "O";
+        const payload = {
+          user_id: user.userId,
+          design_id: p.designCode,
+          pol_rate: (isO ? polEntry.normalPol : polEntry.brandPol) as number,
+          prp_rate: (isO ? polEntry.normalPrp : polEntry.brandPrp) as number,
+          dhaga_rate: (isO
+            ? polEntry.normalDhaga
+            : polEntry.brandDhaga) as number,
+        };
+        return { productId: p.id, run: () => submitPolRate(payload) };
+      });
+    } else if (user.role === "MANAGER") {
+      jobs = submittableProducts.map((p) => {
+        const sectionEntry = entries[p.id]?.MANAGER ?? {};
+        const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
+        const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
+        const isO = p.custType === "O";
+        const payload = {
+          user_id: user.userId,
+          design_id: p.designCode,
+          difficulty: sectionEntry.difficulty as string,
+          manager_fil_rate: sectionEntry.filRate as number,
+          manager_pol_rate: (isO
+            ? polEntry.normalPol
+            : polEntry.brandPol) as number,
+          manager_prp_rate: (isO
+            ? polEntry.normalPrp
+            : polEntry.brandPrp) as number,
+          manager_dhaga_rate: (isO
+            ? polEntry.normalDhaga
+            : polEntry.brandDhaga) as number,
+        };
+        return { productId: p.id, run: () => submitManagerRate(payload) };
+      });
+    } else {
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitSummary(null);
+    setRowStatuses({});
+    setRowMessages({});
+
+    let done = 0;
+    let failed = 0;
+
+    // Worker-pool: up to MAX_CONCURRENCY jobs in flight at once. Each worker
+    // pulls the next index from a shared cursor and processes one job,
+    // looping until the queue is drained.
+    const MAX_CONCURRENCY = 5;
+    let cursor = 0;
+
+    const processOne = async (job: Job) => {
+      setRowStatuses((s) => ({ ...s, [job.productId]: "submitting" }));
+      try {
+        const result = await job.run();
+        if (result.status === "1") {
+          done++;
+          setRowStatuses((s) => ({ ...s, [job.productId]: "done" }));
+        } else {
+          failed++;
+          const message = Array.isArray(result.message)
+            ? result.message.join(", ")
+            : result.message;
+          setRowStatuses((s) => ({ ...s, [job.productId]: "error" }));
+          setRowMessages((m) => ({ ...m, [job.productId]: message }));
+        }
+      } catch (err) {
+        failed++;
+        const message =
+          err instanceof Error ? err.message : "Network error.";
+        setRowStatuses((s) => ({ ...s, [job.productId]: "error" }));
+        setRowMessages((m) => ({ ...m, [job.productId]: message }));
+      }
+    };
+
+    const worker = async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= jobs.length) return;
+        await processOne(jobs[i]);
+      }
+    };
+
+    const workerCount = Math.min(MAX_CONCURRENCY, jobs.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, () => worker())
+    );
+
+    setSubmitSummary({ total: jobs.length, done, failed });
+    setSubmitting(false);
+  }, [
+    submitting,
+    submittableProducts,
+    entries,
+    user.userId,
+    user.role,
+    polRatesByCategory,
+  ]);
 
   return (
     <div className="rate-entry">
@@ -194,8 +443,13 @@ export default function RateEntryView({
           <tbody>
             {products.map((p) => {
               const productEntries = entries[p.id] ?? {};
+              const rowStatus = rowStatuses[p.id];
+              const rowMessage = rowMessages[p.id];
+              const rowClass = rowStatus
+                ? `rate-entry__row rate-entry__row--${rowStatus}`
+                : "rate-entry__row";
               return (
-                <tr key={p.id} className="rate-entry__row">
+                <tr key={p.id} className={rowClass}>
                   <td className="rate-entry__td rate-entry__td--image">
                     <div className="rate-entry__thumb">
                       <ImageBox
@@ -207,15 +461,59 @@ export default function RateEntryView({
                     </div>
                   </td>
                   <td className="rate-entry__td">
-                    <div className="rate-entry__design">{p.designCode}</div>
+                    <div className="rate-entry__design-row">
+                      <span className="rate-entry__design">{p.designCode}</span>
+                      {rowStatus ? (
+                        <RowStatusBadge
+                          status={rowStatus}
+                          message={rowMessage}
+                        />
+                      ) : null}
+                    </div>
                     <div className="rate-entry__sub">{p.custCode}</div>
                   </td>
                   <td className="rate-entry__td">
                     <div className="rate-entry__manager">{p.managerShort}</div>
                   </td>
                   {sections.map((s) => {
-                    const sectionEntry = productEntries[s] ?? {};
+                    const ownEntry = productEntries[s] ?? {};
                     const isEditable = s === editableSection;
+
+                    // Manager's read-only FIL / POL sections fall back to what
+                    // those users have actually submitted, fetched from the
+                    // by-user endpoints.
+                    let sectionEntry: RateEntry = ownEntry;
+                    if (
+                      user.role === "MANAGER" &&
+                      !isEditable &&
+                      s === "FIL"
+                    ) {
+                      const submitted = submittedFilByDesign.get(p.designCode);
+                      if (submitted) {
+                        sectionEntry = {
+                          ...ownEntry,
+                          difficulty:
+                            ownEntry.difficulty ?? submitted.difficulty,
+                          filRate: ownEntry.filRate ?? submitted.filRate,
+                        };
+                      }
+                    } else if (
+                      user.role === "MANAGER" &&
+                      !isEditable &&
+                      s === "POL"
+                    ) {
+                      const submitted = submittedPolByDesign.get(p.designCode);
+                      if (submitted) {
+                        sectionEntry = {
+                          ...ownEntry,
+                          polRate: ownEntry.polRate ?? submitted.polRate,
+                          prpRate: ownEntry.prpRate ?? submitted.prpRate,
+                          dhagaRate:
+                            ownEntry.dhagaRate ?? submitted.dhagaRate,
+                        };
+                      }
+                    }
+
                     // POL section in manager's read-only view stays empty until
                     // real POL data arrives — don't pre-fill from the design.
                     const effectiveDmCtg =
@@ -223,6 +521,20 @@ export default function RateEntryView({
                         ? p.polCtg
                         : sectionEntry.dmCtg ??
                           (isEditable ? p.polCtg : "");
+
+                    // For the POL section's three rate cells:
+                    //   - editable (POL user / MANAGER): derive from DmCtg+custType.
+                    //   - read-only (manager view): show whatever the POL user
+                    //     actually submitted on this design (else "—").
+                    const polSectionRates: CategoryRates =
+                      s === "POL" && !isEditable
+                        ? {
+                            polRate: sectionEntry.polRate,
+                            prpRate: sectionEntry.prpRate,
+                            dhagaRate: sectionEntry.dhagaRate,
+                          }
+                        : buildCategoryRates(effectiveDmCtg, p.custType);
+
                     return (
                       <SectionCells
                         key={s}
@@ -234,10 +546,7 @@ export default function RateEntryView({
                           s === "POL" ? localDifficultyCodes : apiDifficultyCodes
                         }
                         getFilRate={buildFilRateLookup(p.custType)}
-                        categoryRates={buildCategoryRates(
-                          effectiveDmCtg,
-                          p.custType
-                        )}
+                        categoryRates={polSectionRates}
                         polCategoryCodes={polCategoryCodes}
                         dmCtgValue={effectiveDmCtg}
                       />
@@ -249,7 +558,80 @@ export default function RateEntryView({
           </tbody>
         </table>
       </div>
+
+      {user.role === "FIL" ||
+      user.role === "POL" ||
+      user.role === "MANAGER" ? (
+        <div className="rate-entry__submit-bar">
+          <div className="rate-entry__submit-info">
+            {submittableProducts.length === 0 ? (
+              <span className="rate-entry__submit-hint">
+                {user.role === "POL"
+                  ? "Pick a DmCtg for at least one row to enable submission."
+                  : "Pick a difficulty for at least one row to enable submission."}
+              </span>
+            ) : (
+              <span className="rate-entry__submit-hint">
+                Ready to submit{" "}
+                <strong>{submittableProducts.length}</strong>{" "}
+                {submittableProducts.length === 1 ? "rate" : "rates"}.
+              </span>
+            )}
+            {submitSummary ? (
+              <span
+                className={`rate-entry__submit-summary${
+                  submitSummary.failed > 0
+                    ? " rate-entry__submit-summary--mixed"
+                    : " rate-entry__submit-summary--ok"
+                }`}
+              >
+                Saved {submitSummary.done} of {submitSummary.total}
+                {submitSummary.failed > 0
+                  ? ` · ${submitSummary.failed} failed`
+                  : ""}
+                .
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="rate-entry__submit-btn"
+            onClick={handleSubmit}
+            disabled={submitting || submittableProducts.length === 0}
+          >
+            {submitting
+              ? "Submitting…"
+              : user.role === "FIL"
+              ? "Submit FIL rates"
+              : user.role === "POL"
+              ? "Submit POL rates"
+              : "Submit Manager approvals"}
+          </button>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+interface RowStatusBadgeProps {
+  status: RowSubmitState;
+  message?: string;
+}
+
+function RowStatusBadge({ status, message }: RowStatusBadgeProps) {
+  const label =
+    status === "submitting"
+      ? "Sending…"
+      : status === "done"
+      ? "Saved"
+      : "Failed";
+  return (
+    <span
+      className={`rate-entry__row-badge rate-entry__row-badge--${status}`}
+      title={message ?? label}
+    >
+      {label}
+    </span>
   );
 }
 

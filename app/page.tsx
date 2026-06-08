@@ -7,10 +7,20 @@ import ProductsReport from "@/components/products-report/productsReport";
 import {
   fetchDesignApprovals,
   fetchDifficultyHeaders,
+  fetchFilRatesByUser,
   fetchPolRates,
+  fetchPolRatesByUser,
   type DifficultyRate,
   type PolRate,
+  type SubmittedFilRate,
+  type SubmittedPolRate,
 } from "@/services/api";
+
+// Hard-coded for now: the manager always pulls FIL submissions from this
+// FIL user and POL submissions from this POL user. Swap to a dynamic
+// lookup if/when the backend exposes "all submitters".
+const FIL_USER_ID_FOR_MANAGER = "2";
+const POL_USER_ID_FOR_MANAGER = "1";
 import type { Product } from "@/types/product";
 import type { Profile } from "@/types/profile";
 
@@ -27,6 +37,12 @@ export default function Home() {
   const [load, setLoad] = useState<LoadState>({ status: "idle" });
   const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
   const [polRates, setPolRates] = useState<PolRate[]>([]);
+  const [submittedFilRates, setSubmittedFilRates] = useState<
+    SubmittedFilRate[]
+  >([]);
+  const [submittedPolRates, setSubmittedPolRates] = useState<
+    SubmittedPolRate[]
+  >([]);
   const [rateDataStatus, setRateDataStatus] = useState<RateDataStatus>("idle");
   const [refetchKey, setRefetchKey] = useState(0);
 
@@ -39,6 +55,8 @@ export default function Home() {
     setRateDataStatus("idle");
     setDifficultyRates([]);
     setPolRates([]);
+    setSubmittedFilRates([]);
+    setSubmittedPolRates([]);
 
     if (!user) {
       setLoad({ status: "idle" });
@@ -85,6 +103,18 @@ export default function Home() {
         if (sessionRef.current !== session) return;
         setPolRates(pols);
       }
+      if (user.role === "MANAGER") {
+        // Sequentially pull what FIL and POL have submitted so the manager's
+        // read-only sections can be filled in. Stays sequential because the
+        // server has had timeout issues with parallel calls.
+        const filSubs = await fetchFilRatesByUser(FIL_USER_ID_FOR_MANAGER);
+        if (sessionRef.current !== session) return;
+        setSubmittedFilRates(filSubs);
+
+        const polSubs = await fetchPolRatesByUser(POL_USER_ID_FOR_MANAGER);
+        if (sessionRef.current !== session) return;
+        setSubmittedPolRates(polSubs);
+      }
       if (sessionRef.current !== session) return;
       rateStatusRef.current = "ready";
       setRateDataStatus("ready");
@@ -123,6 +153,8 @@ export default function Home() {
             difficultyHeaders={difficultyHeaders}
             difficultyRates={difficultyRates}
             polRates={polRates}
+            submittedFilRates={submittedFilRates}
+            submittedPolRates={submittedPolRates}
             rateDataStatus={rateDataStatus}
             onLoadRateData={loadRateData}
           />
