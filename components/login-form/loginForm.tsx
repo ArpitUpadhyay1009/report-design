@@ -1,40 +1,42 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useState } from "react";
-import { profiles } from "@/constants/profile";
-import type { Profile } from "@/types/profile";
+import { useAuth } from "@/contexts/AuthContext";
 import "./loginForm.css";
 
-interface LoginFormProps {
-  onSuccess: (user: Profile) => void;
-}
-
-export default function LoginForm({ onSuccess }: LoginFormProps) {
-  const [email, setEmail] = useState("");
+export default function LoginForm() {
+  const { login } = useAuth();
+  const [empCode, setEmpCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !password) {
-      setError("Please enter both email and password.");
+    const trimmedEmpCode = empCode.trim();
+    if (!trimmedEmpCode || !password) {
+      setError("Please enter both EmpCode and password.");
       return;
     }
 
-    const match = (profiles as Profile[]).find(
-      (p) => p.email.toLowerCase() === trimmedEmail && p.password === password
-    );
-
-    if (!match) {
-      setError("Invalid email or password.");
-      return;
+    setSubmitting(true);
+    try {
+      await login(trimmedEmpCode, password);
+      // On success the AuthProvider switches state to "authenticated" and
+      // the parent unmounts this form — nothing else to do here.
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Login failed. Please try again.";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
     }
-
-    onSuccess(match);
   };
 
   return (
@@ -61,18 +63,22 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
           </span>
           <div>
             <h1 className="login__title">Welcome back</h1>
-            <p className="login__subtitle">Sign in to view the production report</p>
+            <p className="login__subtitle">
+              Sign in with your employee code to view the production report
+            </p>
           </div>
         </div>
 
         <label className="login__field">
-          <span>Email</span>
+          <span>EmpCode</span>
           <input
-            type="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            inputMode="numeric"
+            autoComplete="username"
+            placeholder="e.g. 12345"
+            value={empCode}
+            onChange={(e) => setEmpCode(e.target.value)}
+            disabled={submitting}
             required
           />
         </label>
@@ -86,6 +92,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
               placeholder="••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={submitting}
               required
             />
             <button
@@ -93,6 +100,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
               className="login__toggle"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? "Hide password" : "Show password"}
+              disabled={submitting}
             >
               {showPassword ? "Hide" : "Show"}
             </button>
@@ -105,13 +113,13 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
           </div>
         ) : null}
 
-        <button type="submit" className="login__submit">
-          Sign in
+        <button
+          type="submit"
+          className="login__submit"
+          disabled={submitting}
+        >
+          {submitting ? "Signing in…" : "Sign in"}
         </button>
-
-        <p className="login__hint">
-          Demo: <code>arpit@example.com</code> / <code>123</code>
-        </p>
       </form>
     </div>
   );

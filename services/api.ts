@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { Product } from "@/types/product";
+import type { Profile, Role } from "@/types/profile";
 
 const API_BASE = "https://unitab.unidesign-jewel.com/tab_app/index.php";
 
@@ -385,4 +386,105 @@ export async function fetchPolRatesByUser(
       };
     })
     .filter((r): r is SubmittedPolRate => r !== null);
+}
+
+// ---------------------------------------------------------------------------
+// Login (POST /report-login)
+// ---------------------------------------------------------------------------
+
+// Map the backend's EmpRoleid value to our internal Role union.
+// Confirmed values from EmployeeMaster:
+//   4 -> MANAGER
+//   6 -> FIL
+// POL's EmpRoleid hasn't been confirmed yet; add it here when known.
+export const ROLE_BY_EMP_ROLE_ID: Record<string, Role> = {
+  "4": "MANAGER",
+  "6": "FIL",
+};
+
+export function resolveRoleFromEmpRoleId(
+  empRoleId: string | number | null | undefined
+): Role | null {
+  if (empRoleId === null || empRoleId === undefined) return null;
+  const key = String(empRoleId).trim();
+  return ROLE_BY_EMP_ROLE_ID[key] ?? null;
+}
+
+interface LoginResponseData {
+  EmpUniqid: string | number | null;
+  EmpName: string | null;
+  EmpRoleid: string | number | null;
+  AttendanceEmpCode: string | null;
+  supervisor_code: string | null;
+  supervisor_name: string | null;
+  cell_id: string | null;
+  process_id: string | null;
+}
+
+interface LoginResponse {
+  status: string;
+  is_logedin?: number;
+  data?: LoginResponseData;
+  message: string | string[];
+}
+
+const messageOf = (m: string | string[] | undefined): string =>
+  Array.isArray(m) ? m.join(", ") : m ?? "";
+
+/**
+ * POST /report-login with EmpCode + password.
+ *
+ * On 4xx the server still returns a JSON body with a friendly message
+ * (e.g. "User not found", "Incorrect password") — we surface that as the
+ * thrown Error's message rather than a generic axios error.
+ */
+export async function loginWithEmpCode(
+  empCode: string,
+  password: string
+): Promise<Profile> {
+  const body = new URLSearchParams();
+  body.append("EmpCode", empCode);
+  body.append("password", password);
+
+  let payload: LoginResponse;
+  try {
+    const response = await apiClient.post<LoginResponse>(
+      "/report-login",
+      body,
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+    payload = response.data;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.data) {
+      const data = err.response.data as Partial<LoginResponse>;
+      const msg = messageOf(data.message);
+      throw new Error(msg || "Login failed.");
+    }
+    throw err instanceof Error ? err : new Error("Login failed.");
+  }
+
+  if (payload.status !== "1" || !payload.data) {
+    throw new Error(messageOf(payload.message) || "Login failed.");
+  }
+
+  const role = resolveRoleFromEmpRoleId(payload.data.EmpRoleid);
+  if (!role) {
+    throw new Error(
+      `This account's role (EmpRoleid = ${payload.data.EmpRoleid ?? "?"}) ` +
+        `is not configured for the report. Contact an administrator.`
+    );
+  }
+
+  return {
+    userId: String(payload.data.EmpUniqid ?? "").trim(),
+    empCode: empCode.trim(),
+    name: (payload.data.EmpName ?? empCode).trim(),
+    role,
+    empRoleId: String(payload.data.EmpRoleid ?? "").trim(),
+    attendanceEmpCode: payload.data.AttendanceEmpCode ?? undefined,
+    supervisorCode: payload.data.supervisor_code ?? undefined,
+    supervisorName: payload.data.supervisor_name ?? undefined,
+    cellId: payload.data.cell_id ?? undefined,
+    processId: payload.data.process_id ?? undefined,
+  };
 }

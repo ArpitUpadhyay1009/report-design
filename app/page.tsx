@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/header/header";
 import LoginForm from "@/components/login-form/loginForm";
 import ProductsReport from "@/components/products-report/productsReport";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchDesignApprovals,
   fetchDifficultyHeaders,
@@ -15,14 +16,13 @@ import {
   type SubmittedFilRate,
   type SubmittedPolRate,
 } from "@/services/api";
+import type { Product } from "@/types/product";
 
 // Hard-coded for now: the manager always pulls FIL submissions from this
 // FIL user and POL submissions from this POL user. Swap to a dynamic
 // lookup if/when the backend exposes "all submitters".
 const FIL_USER_ID_FOR_MANAGER = "2";
 const POL_USER_ID_FOR_MANAGER = "1";
-import type { Product } from "@/types/product";
-import type { Profile } from "@/types/profile";
 
 type LoadState =
   | { status: "idle" }
@@ -33,7 +33,7 @@ type LoadState =
 export type RateDataStatus = "idle" | "loading" | "ready" | "error";
 
 export default function Home() {
-  const [user, setUser] = useState<Profile | null>(null);
+  const { status: authStatus, user, logout } = useAuth();
   const [load, setLoad] = useState<LoadState>({ status: "idle" });
   const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
   const [polRates, setPolRates] = useState<PolRate[]>([]);
@@ -131,16 +131,27 @@ export default function Home() {
     [difficultyRates]
   );
 
-  const handleLogout = useCallback(() => setUser(null), []);
   const handleRetry = useCallback(() => setRefetchKey((k) => k + 1), []);
 
+  // Auth still hydrating from localStorage — don't flash the login screen.
+  if (authStatus === "loading") {
+    return (
+      <main>
+        <LoadingState
+          title="Restoring session…"
+          subtitle="Checking for an existing login on this device."
+        />
+      </main>
+    );
+  }
+
   if (!user) {
-    return <LoginForm onSuccess={setUser} />;
+    return <LoginForm />;
   }
 
   return (
     <>
-      <Header user={user} onLogout={handleLogout} />
+      <Header user={user} onLogout={logout} />
       <main>
         {load.status === "loading" || load.status === "idle" ? (
           <LoadingState />
@@ -164,12 +175,20 @@ export default function Home() {
   );
 }
 
-function LoadingState() {
+interface LoadingStateProps {
+  title?: string;
+  subtitle?: string;
+}
+
+function LoadingState({
+  title = "Loading designs…",
+  subtitle = "Fetching the latest data from the server.",
+}: LoadingStateProps) {
   return (
     <div className="page-state">
       <div className="page-state__spinner" aria-hidden="true" />
-      <p className="page-state__title">Loading designs…</p>
-      <p className="page-state__subtitle">Fetching the latest data from the server.</p>
+      <p className="page-state__title">{title}</p>
+      <p className="page-state__subtitle">{subtitle}</p>
     </div>
   );
 }
