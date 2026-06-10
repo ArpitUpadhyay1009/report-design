@@ -86,9 +86,31 @@ const mapRow = (row: DesignApprovalRow, index: number): Product => {
   };
 };
 
-export async function fetchDesignApprovals(): Promise<Product[]> {
+export interface DesignApprovalsParams {
+  /** ISO date string in yyyy-mm-dd format, inclusive. */
+  fromDate: string;
+  /** ISO date string in yyyy-mm-dd format, inclusive. */
+  toDate: string;
+  /** Filter the SP to designs owned by this manager (matches @managerName). */
+  managerName: string;
+}
+
+export async function fetchDesignApprovals(
+  params: DesignApprovalsParams
+): Promise<Product[]> {
+  // Field names mirror the stored procedure parameters
+  // (USP_Design_approval_Automation @FromDate, @ToDate, @managerName),
+  // so the casing is what the SP expects rather than our snake_case
+  // convention used elsewhere.
+  const body = new URLSearchParams();
+  body.append("FromDate", params.fromDate);
+  body.append("ToDate", params.toDate);
+  body.append("managerName", params.managerName);
+
   const response = await apiClient.post<DesignApprovalResponse>(
-    "/get-Design-approval-Automation"
+    "/get-Design-approval-Automation",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
   );
 
   const rows = response.data?.data ?? [];

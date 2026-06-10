@@ -16,7 +16,7 @@ import {
   type SubmittedFilRate,
   type SubmittedPolRate,
 } from "@/services/api";
-import type { Product } from "@/types/product";
+import type { LoadState } from "@/components/products-report/productsReport";
 
 // Hard-coded for now: the manager always pulls FIL submissions from this
 // FIL user and POL submissions from this POL user. Swap to a dynamic
@@ -24,13 +24,21 @@ import type { Product } from "@/types/product";
 const FIL_USER_ID_FOR_MANAGER = "2";
 const POL_USER_ID_FOR_MANAGER = "1";
 
-type LoadState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; products: Product[] }
-  | { status: "error"; message: string };
+// Hard-coded manager filter for the design-approvals SP. Replace with a
+// per-user lookup (e.g. derived from the logged-in profile) when the
+// backend supports it.
+const DEFAULT_MANAGER_NAME = "KIRAN VIRAS";
 
 export type RateDataStatus = "idle" | "loading" | "ready" | "error";
+
+const formatDate = (d: Date): string => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const todayString = () => formatDate(new Date());
 
 export default function Home() {
   const { status: authStatus, user, logout } = useAuth();
@@ -46,9 +54,18 @@ export default function Home() {
   const [rateDataStatus, setRateDataStatus] = useState<RateDataStatus>("idle");
   const [refetchKey, setRefetchKey] = useState(0);
 
+  // Date range used by the design-approvals API. Default to "today" for
+  // both so the first load returns *something*; user can widen the range
+  // from the toolbar.
+  const [fromDate, setFromDate] = useState<string>(() => todayString());
+  const [toDate, setToDate] = useState<string>(() => todayString());
+
   const sessionRef = useRef(0);
   const rateStatusRef = useRef<RateDataStatus>("idle");
 
+  // Reset rate-data caches whenever the user changes (login / logout).
+  // Date changes deliberately do NOT trigger this reset because the rate
+  // APIs are independent of the design date range.
   useEffect(() => {
     sessionRef.current += 1;
     rateStatusRef.current = "idle";
@@ -57,16 +74,40 @@ export default function Home() {
     setPolRates([]);
     setSubmittedFilRates([]);
     setSubmittedPolRates([]);
+  }, [user]);
 
+  // Fetch designs whenever user, dates, or a manual retry changes.
+  // The setState calls below are intentional: this effect synchronizes the
+  // React tree with an external system (the API), which is exactly what
+  // useEffect is for. The lint rule over-fires on this canonical pattern.
+  useEffect(() => {
     if (!user) {
+      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setLoad({ status: "idle" });
+      return;
+    }
+    if (!fromDate || !toDate) {
+      // Toolbar hasn't been fully populated yet — show the empty prompt
+      // instead of firing the API with a missing field.
+      setLoad({ status: "needs-dates" });
+      return;
+    }
+    if (fromDate > toDate) {
+      setLoad({
+        status: "error",
+        message: "From date must be on or before To date.",
+      });
       return;
     }
 
     const session = sessionRef.current;
     setLoad({ status: "loading" });
 
-    fetchDesignApprovals()
+    fetchDesignApprovals({
+      fromDate,
+      toDate,
+      managerName: DEFAULT_MANAGER_NAME,
+    })
       .then((products) => {
         if (sessionRef.current !== session) return;
         setLoad({ status: "success", products });
@@ -77,7 +118,7 @@ export default function Home() {
           err instanceof Error ? err.message : "Could not load designs.";
         setLoad({ status: "error", message });
       });
-  }, [user, refetchKey]);
+  }, [user, refetchKey, fromDate, toDate]);
 
   const loadRateData = useCallback(async () => {
     if (!user) return;
@@ -153,23 +194,22 @@ export default function Home() {
     <>
       <Header user={user} onLogout={logout} />
       <main>
-        {load.status === "loading" || load.status === "idle" ? (
-          <LoadingState />
-        ) : load.status === "error" ? (
-          <ErrorState message={load.message} onRetry={handleRetry} />
-        ) : (
-          <ProductsReport
-            products={load.products}
-            user={user}
-            difficultyHeaders={difficultyHeaders}
-            difficultyRates={difficultyRates}
-            polRates={polRates}
-            submittedFilRates={submittedFilRates}
-            submittedPolRates={submittedPolRates}
-            rateDataStatus={rateDataStatus}
-            onLoadRateData={loadRateData}
-          />
-        )}
+        <ProductsReport
+          load={load}
+          user={user}
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={setFromDate}
+          onToDateChange={setToDate}
+          onRetryLoad={handleRetry}
+          difficultyHeaders={difficultyHeaders}
+          difficultyRates={difficultyRates}
+          polRates={polRates}
+          submittedFilRates={submittedFilRates}
+          submittedPolRates={submittedPolRates}
+          rateDataStatus={rateDataStatus}
+          onLoadRateData={loadRateData}
+        />
       </main>
     </>
   );
@@ -189,35 +229,6 @@ function LoadingState({
       <div className="page-state__spinner" aria-hidden="true" />
       <p className="page-state__title">{title}</p>
       <p className="page-state__subtitle">{subtitle}</p>
-    </div>
-  );
-}
-
-interface ErrorStateProps {
-  message: string;
-  onRetry: () => void;
-}
-
-function ErrorState({ message, onRetry }: ErrorStateProps) {
-  return (
-    <div className="page-state page-state--error">
-      <div className="page-state__icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="28" height="28">
-          <path
-            d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-      <p className="page-state__title">Couldn’t load designs</p>
-      <p className="page-state__subtitle">{message}</p>
-      <button type="button" className="page-state__retry" onClick={onRetry}>
-        Retry
-      </button>
     </div>
   );
 }

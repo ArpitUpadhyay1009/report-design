@@ -25,9 +25,21 @@ type ViewMode = "grid" | "table" | "entry";
 
 export type RateDataStatus = "idle" | "loading" | "ready" | "error";
 
+export type LoadState =
+  | { status: "idle" }
+  | { status: "needs-dates" }
+  | { status: "loading" }
+  | { status: "success"; products: Product[] }
+  | { status: "error"; message: string };
+
 interface ProductsReportProps {
-  products: Product[];
+  load: LoadState;
   user: Profile;
+  fromDate: string;
+  toDate: string;
+  onFromDateChange: (value: string) => void;
+  onToDateChange: (value: string) => void;
+  onRetryLoad: () => void;
   difficultyHeaders?: string[];
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
@@ -44,8 +56,13 @@ const inr = (n: number): string =>
   }).format(n);
 
 export default function ProductsReport({
-  products,
+  load,
   user,
+  fromDate,
+  toDate,
+  onFromDateChange,
+  onToDateChange,
+  onRetryLoad,
   difficultyHeaders,
   difficultyRates,
   polRates,
@@ -57,6 +74,12 @@ export default function ProductsReport({
   const [view, setView] = useState<ViewMode>("table");
   const [query, setQuery] = useState("");
   const [rateEntries, setRateEntries] = useState<RateEntries>({});
+
+  const products = useMemo<Product[]>(
+    () => (load.status === "success" ? load.products : []),
+    [load]
+  );
+  const hasProducts = load.status === "success";
 
   const handleOpenEntry = useCallback(() => {
     setView("entry");
@@ -110,6 +133,7 @@ export default function ProductsReport({
 
   return (
     <section className="products-report">
+      {hasProducts ? (
       <div className="products-report__stats">
         <StatCard
           label="Total designs"
@@ -184,6 +208,7 @@ export default function ProductsReport({
           }
         />
       </div>
+      ) : null}
 
       <div className="products-report__toolbar">
         <div className="products-report__search">
@@ -219,6 +244,32 @@ export default function ProductsReport({
               ×
             </button>
           ) : null}
+        </div>
+
+        <div className="products-report__dates" role="group" aria-label="Date range">
+          <label className="products-report__date">
+            <span className="products-report__date-label">From</span>
+            <input
+              type="date"
+              className="products-report__date-input"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => onFromDateChange(e.target.value)}
+            />
+          </label>
+          <span className="products-report__date-separator" aria-hidden="true">
+            –
+          </span>
+          <label className="products-report__date">
+            <span className="products-report__date-label">To</span>
+            <input
+              type="date"
+              className="products-report__date-input"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => onToDateChange(e.target.value)}
+            />
+          </label>
         </div>
 
         <div className="products-report__view-toggle" role="tablist" aria-label="View mode">
@@ -283,81 +334,144 @@ export default function ProductsReport({
         </div>
       </div>
 
-      {view !== "entry" ? (
-        <div className="products-report__result-meta">
-          Showing <strong>{filtered.length}</strong> of {products.length} designs
-        </div>
-      ) : null}
-
-      {view === "entry" ? (
-        rateDataStatus === "ready" ? (
-          <RateEntryView
-            products={filtered}
-            user={user}
-            entries={rateEntries}
-            onChange={handleRateChange}
-            difficultyOptions={difficultyHeaders}
-            difficultyRates={difficultyRates}
-            polRates={polRates}
-            submittedFilRates={submittedFilRates}
-            submittedPolRates={submittedPolRates}
-          />
-        ) : rateDataStatus === "error" ? (
-          <RateDataError onRetry={() => onLoadRateData?.()} />
-        ) : (
-          <RateDataLoading />
-        )
-      ) : filtered.length === 0 ? (
-        <div className="products-report__empty">
-          <p>No designs match your search.</p>
-          <button type="button" onClick={() => setQuery("")}>
-            Clear search
-          </button>
-        </div>
-      ) : view === "grid" ? (
-        <div className="products-report__grid">
-          {filtered.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+      {load.status === "needs-dates" ? (
+        <NeedsDatesState />
+      ) : load.status === "loading" || load.status === "idle" ? (
+        <LoadingDesignsState />
+      ) : load.status === "error" ? (
+        <DesignsError message={load.message} onRetry={onRetryLoad} />
       ) : (
-        <div className="products-report__table-wrap">
-          <table className="products-report__table">
-            <thead>
-              <tr>
-                <th rowSpan={2}>Image</th>
-                <th rowSpan={2}>Design</th>
-                <th rowSpan={2}>Manager</th>
-                <th rowSpan={2}>Cust</th>
-                <th rowSpan={2}>Parts</th>
-                <th colSpan={3} className="products-report__th-group">
-                  As per standard norms
-                </th>
-                <th colSpan={5} className="products-report__th-group products-report__th-group--accent">
-                  System rate
-                </th>
-                <th rowSpan={2} className="products-report__th-total">Total</th>
-              </tr>
-              <tr>
-                <th>MFR</th>
-                <th>Dep</th>
-                <th>POL CTG</th>
-                <th>Diff</th>
-                <th>FIL</th>
-                <th>POL</th>
-                <th>PRP</th>
-                <th>DHAGA</th>
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {view !== "entry" ? (
+            <div className="products-report__result-meta">
+              Showing <strong>{filtered.length}</strong> of {products.length} designs
+            </div>
+          ) : null}
+
+          {view === "entry" ? (
+            rateDataStatus === "ready" ? (
+              <RateEntryView
+                products={filtered}
+                user={user}
+                entries={rateEntries}
+                onChange={handleRateChange}
+                difficultyOptions={difficultyHeaders}
+                difficultyRates={difficultyRates}
+                polRates={polRates}
+                submittedFilRates={submittedFilRates}
+                submittedPolRates={submittedPolRates}
+              />
+            ) : rateDataStatus === "error" ? (
+              <RateDataError onRetry={() => onLoadRateData?.()} />
+            ) : (
+              <RateDataLoading />
+            )
+          ) : filtered.length === 0 ? (
+            <div className="products-report__empty">
+              {query ? (
+                <>
+                  <p>No designs match your search.</p>
+                  <button type="button" onClick={() => setQuery("")}>
+                    Clear search
+                  </button>
+                </>
+              ) : (
+                <p>
+                  No designs were returned for {fromDate} – {toDate}. Try a
+                  different date range.
+                </p>
+              )}
+            </div>
+          ) : view === "grid" ? (
+            <div className="products-report__grid">
               {filtered.map((p) => (
-                <ProductRow key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          ) : (
+            <div className="products-report__table-wrap">
+              <table className="products-report__table">
+                <thead>
+                  <tr>
+                    <th rowSpan={2}>Image</th>
+                    <th rowSpan={2}>Design</th>
+                    <th rowSpan={2}>Manager</th>
+                    <th rowSpan={2}>Cust</th>
+                    <th rowSpan={2}>Parts</th>
+                    <th colSpan={3} className="products-report__th-group">
+                      As per standard norms
+                    </th>
+                    <th colSpan={5} className="products-report__th-group products-report__th-group--accent">
+                      System rate
+                    </th>
+                    <th rowSpan={2} className="products-report__th-total">Total</th>
+                  </tr>
+                  <tr>
+                    <th>MFR</th>
+                    <th>Dep</th>
+                    <th>POL CTG</th>
+                    <th>Diff</th>
+                    <th>FIL</th>
+                    <th>POL</th>
+                    <th>PRP</th>
+                    <th>DHAGA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((p) => (
+                    <ProductRow key={p.id} product={p} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </section>
+  );
+}
+
+function NeedsDatesState() {
+  return (
+    <div className="products-report__rate-state">
+      <p className="products-report__rate-title">Pick a date range</p>
+      <p className="products-report__rate-subtitle">
+        Choose both a From and To date above to load designs.
+      </p>
+    </div>
+  );
+}
+
+function LoadingDesignsState() {
+  return (
+    <div className="products-report__rate-state">
+      <div className="products-report__rate-spinner" aria-hidden="true" />
+      <p className="products-report__rate-title">Loading designs…</p>
+      <p className="products-report__rate-subtitle">
+        Fetching the latest data from the server.
+      </p>
+    </div>
+  );
+}
+
+interface DesignsErrorProps {
+  message: string;
+  onRetry: () => void;
+}
+
+function DesignsError({ message, onRetry }: DesignsErrorProps) {
+  return (
+    <div className="products-report__rate-state products-report__rate-state--error">
+      <p className="products-report__rate-title">Couldn’t load designs</p>
+      <p className="products-report__rate-subtitle">{message}</p>
+      <button
+        type="button"
+        className="products-report__rate-retry"
+        onClick={onRetry}
+      >
+        Retry
+      </button>
+    </div>
   );
 }
 

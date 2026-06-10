@@ -83,6 +83,66 @@
   background: #cbd5e1;
 }
 
+.products-report__dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.products-report__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  transition: border-color 150ms ease, background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.products-report__date:focus-within {
+  background: #ffffff;
+  border-color: #c4b5fd;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.products-report__date-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.products-report__date-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #0f172a;
+  font-family: inherit;
+  padding: 2px 0;
+  /* Native date input has its own min width that we need to allow. */
+  min-width: 116px;
+}
+
+.products-report__date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.products-report__date-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.products-report__date-separator {
+  color: #94a3b8;
+  font-size: 13px;
+  user-select: none;
+}
+
 .products-report__view-toggle {
   display: flex;
   gap: 2px;
