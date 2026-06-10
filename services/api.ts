@@ -402,12 +402,46 @@ export const ROLE_BY_EMP_ROLE_ID: Record<string, Role> = {
   "6": "FIL",
 };
 
+// EmpCode-specific overrides. These win over ROLE_BY_EMP_ROLE_ID and are
+// used when the same EmpRoleid is shared across multiple business roles
+// and we have to disambiguate by EmpCode. Keys are normalized to uppercase
+// at lookup time, so "fw1950" / "FW1950" both match.
+export const ROLE_BY_EMP_CODE: Record<string, Role> = {
+  "31615": "POL",
+  "FW1950": "FIL",
+};
+
+const ROLE_BY_EMP_CODE_NORMALIZED: Record<string, Role> = Object.fromEntries(
+  Object.entries(ROLE_BY_EMP_CODE).map(([k, v]) => [k.trim().toUpperCase(), v])
+);
+
 export function resolveRoleFromEmpRoleId(
   empRoleId: string | number | null | undefined
 ): Role | null {
   if (empRoleId === null || empRoleId === undefined) return null;
   const key = String(empRoleId).trim();
   return ROLE_BY_EMP_ROLE_ID[key] ?? null;
+}
+
+/**
+ * Resolve the effective UI role for a logged-in user.
+ *
+ * Order of precedence:
+ *   1. EmpCode override (ROLE_BY_EMP_CODE)  — handles cases like a single
+ *      "Operator" role-id covering both POL and FIL employees.
+ *   2. EmpRoleid mapping (ROLE_BY_EMP_ROLE_ID).
+ */
+export function resolveRole(
+  empCode: string | null | undefined,
+  empRoleId: string | number | null | undefined
+): Role | null {
+  if (empCode) {
+    const codeKey = String(empCode).trim().toUpperCase();
+    if (codeKey && codeKey in ROLE_BY_EMP_CODE_NORMALIZED) {
+      return ROLE_BY_EMP_CODE_NORMALIZED[codeKey];
+    }
+  }
+  return resolveRoleFromEmpRoleId(empRoleId);
 }
 
 interface LoginResponseData {
@@ -467,7 +501,7 @@ export async function loginWithEmpCode(
     throw new Error(messageOf(payload.message) || "Login failed.");
   }
 
-  const role = resolveRoleFromEmpRoleId(payload.data.EmpRoleid);
+  const role = resolveRole(empCode, payload.data.EmpRoleid);
   if (!role) {
     throw new Error(
       `This account's role (EmpRoleid = ${payload.data.EmpRoleid ?? "?"}) ` +
