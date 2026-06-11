@@ -24,11 +24,6 @@ import type { LoadState } from "@/components/products-report/productsReport";
 const FIL_USER_ID_FOR_MANAGER = "2";
 const POL_USER_ID_FOR_MANAGER = "1";
 
-// Hard-coded manager filter for the design-approvals SP. Replace with a
-// per-user lookup (e.g. derived from the logged-in profile) when the
-// backend supports it.
-const DEFAULT_MANAGER_NAME = "KIRAN VIRAS";
-
 export type RateDataStatus = "idle" | "loading" | "ready" | "error";
 
 const formatDate = (d: Date): string => {
@@ -103,10 +98,14 @@ export default function Home() {
     const session = sessionRef.current;
     setLoad({ status: "loading" });
 
+    // Always send roleId (raw EmpRoleid from login). Only send managerName
+    // when the logged-in user is a MANAGER — for FIL / POL the SP scopes
+    // results from the role alone, so we deliberately leave it off.
     fetchDesignApprovals({
       fromDate,
       toDate,
-      managerName: DEFAULT_MANAGER_NAME,
+      roleId: user.empRoleId,
+      managerName: user.role === "MANAGER" ? user.name : undefined,
     })
       .then((products) => {
         if (sessionRef.current !== session) return;

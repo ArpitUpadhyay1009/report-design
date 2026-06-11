@@ -91,21 +91,32 @@ export interface DesignApprovalsParams {
   fromDate: string;
   /** ISO date string in yyyy-mm-dd format, inclusive. */
   toDate: string;
-  /** Filter the SP to designs owned by this manager (matches @managerName). */
-  managerName: string;
+  /**
+   * Raw EmpRoleid value from the login response — always sent so the SP
+   * can scope its result set to what the role is allowed to see.
+   */
+  roleId: string;
+  /**
+   * Only set when the logged-in user is a MANAGER. Omit for FIL / POL.
+   * When omitted the field is not added to the request body at all.
+   */
+  managerName?: string;
 }
 
 export async function fetchDesignApprovals(
   params: DesignApprovalsParams
 ): Promise<Product[]> {
   // Field names mirror the stored procedure parameters
-  // (USP_Design_approval_Automation @FromDate, @ToDate, @managerName),
-  // so the casing is what the SP expects rather than our snake_case
-  // convention used elsewhere.
+  // (USP_Design_approval_Automation @FromDate, @ToDate, @roleId,
+  // @managerName), so the casing is what the SP expects rather than our
+  // snake_case convention used elsewhere.
   const body = new URLSearchParams();
   body.append("FromDate", params.fromDate);
   body.append("ToDate", params.toDate);
-  body.append("managerName", params.managerName);
+  body.append("roleId", params.roleId);
+  if (params.managerName !== undefined && params.managerName !== "") {
+    body.append("managerName", params.managerName);
+  }
 
   const response = await apiClient.post<DesignApprovalResponse>(
     "/get-Design-approval-Automation",
