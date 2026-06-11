@@ -177,6 +177,7 @@ export default function RateEntryView({
   };
 
   const [submitting, setSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [rowStatuses, setRowStatuses] = useState<
     Record<string, RowSubmitState>
   >({});
@@ -185,9 +186,9 @@ export default function RateEntryView({
     null
   );
 
-  const submittableProducts = useMemo(() => {
-    if (user.role === "FIL") {
-      return products.filter((p) => {
+  const isProductValid = useCallback(
+    (p: Product): boolean => {
+      if (user.role === "FIL") {
         const e = entries[p.id]?.FIL;
         return (
           !!e &&
@@ -196,10 +197,8 @@ export default function RateEntryView({
           typeof e.filRate === "number" &&
           Number.isFinite(e.filRate)
         );
-      });
-    }
-    if (user.role === "POL") {
-      return products.filter((p) => {
+      }
+      if (user.role === "POL") {
         const sectionEntry = entries[p.id]?.POL ?? {};
         const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
         if (!effectiveDmCtg) return false;
@@ -216,13 +215,9 @@ export default function RateEntryView({
           typeof prpRate === "number" &&
           typeof dhagaRate === "number"
         );
-      });
-    }
-    if (user.role === "MANAGER") {
-      return products.filter((p) => {
+      }
+      if (user.role === "MANAGER") {
         const sectionEntry = entries[p.id]?.MANAGER ?? {};
-        // Manager must have picked a difficulty (which auto-fills filRate via
-        // the FIL-rate lookup; we still guard both fields).
         if (
           typeof sectionEntry.difficulty !== "string" ||
           sectionEntry.difficulty.length === 0 ||
@@ -231,8 +226,6 @@ export default function RateEntryView({
         ) {
           return false;
         }
-        // POL/PRP/DHAGA come from polCtg (or manager's DmCtg override) ×
-        // custType, exactly like the POL section.
         const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
         if (!effectiveDmCtg) return false;
         const polEntry = polRatesByCategory.get(effectiveDmCtg);
@@ -248,10 +241,43 @@ export default function RateEntryView({
           typeof prpRate === "number" &&
           typeof dhagaRate === "number"
         );
-      });
-    }
-    return [] as Product[];
-  }, [user.role, products, entries, polRatesByCategory]);
+      }
+      return false;
+    },
+    [user.role, entries, polRatesByCategory]
+  );
+
+  const submittableProducts = useMemo(
+    () =>
+      products.filter((p) => selectedIds.has(p.id) && isProductValid(p)),
+    [products, selectedIds, isProductValid]
+  );
+
+  const selectedCount = useMemo(
+    () => products.filter((p) => selectedIds.has(p.id)).length,
+    [products, selectedIds]
+  );
+
+  const allSelected =
+    products.length > 0 && products.every((p) => selectedIds.has(p.id));
+
+  const toggleRow = useCallback((productId: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(productId);
+      else next.delete(productId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (products.length === 0) return prev;
+      const everySelected = products.every((p) => prev.has(p.id));
+      if (everySelected) return new Set();
+      return new Set(products.map((p) => p.id));
+    });
+  }, [products]);
 
   const handleSubmit = useCallback(async () => {
     if (submitting || submittableProducts.length === 0) return;
@@ -398,8 +424,8 @@ export default function RateEntryView({
           </h2>
           <p className="rate-entry__subtitle">
             {user.role === "MANAGER"
-              ? "Review what FIL and POL filled, then enter your final approved rates."
-              : "Pick from the dropdowns below — rates fill in automatically."}
+              ? "Review what FIL and POL filled, enter your final approved rates, then check the rows to submit."
+              : "Pick from the dropdowns below — rates fill in automatically. Check the rows you want to submit."}
           </p>
         </div>
         <div className="rate-entry__legend">
@@ -413,7 +439,7 @@ export default function RateEntryView({
         <table className="rate-entry__table">
           <thead>
             <tr className="rate-entry__group-row">
-              <th colSpan={3} className="rate-entry__group rate-entry__group--design">
+              <th colSpan={4} className="rate-entry__group rate-entry__group--design">
                 Design
               </th>
               {sections.map((s) => (
@@ -432,6 +458,17 @@ export default function RateEntryView({
               ))}
             </tr>
             <tr className="rate-entry__col-row">
+              <th className="rate-entry__th rate-entry__th--check">
+                <input
+                  type="checkbox"
+                  className="rate-entry__checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  disabled={submitting || products.length === 0}
+                  aria-label="Select all rows"
+                  title="Select all rows"
+                />
+              </th>
               <th className="rate-entry__th rate-entry__th--image">Image</th>
               <th className="rate-entry__th">Design</th>
               <th className="rate-entry__th">Manager</th>
@@ -445,11 +482,26 @@ export default function RateEntryView({
               const productEntries = entries[p.id] ?? {};
               const rowStatus = rowStatuses[p.id];
               const rowMessage = rowMessages[p.id];
-              const rowClass = rowStatus
-                ? `rate-entry__row rate-entry__row--${rowStatus}`
-                : "rate-entry__row";
+              const isSelected = selectedIds.has(p.id);
+              const rowClass = [
+                "rate-entry__row",
+                rowStatus ? `rate-entry__row--${rowStatus}` : "",
+                isSelected ? "rate-entry__row--selected" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
               return (
                 <tr key={p.id} className={rowClass}>
+                  <td className="rate-entry__td rate-entry__td--check">
+                    <input
+                      type="checkbox"
+                      className="rate-entry__checkbox"
+                      checked={isSelected}
+                      onChange={(e) => toggleRow(p.id, e.target.checked)}
+                      disabled={submitting}
+                      aria-label={`Select ${p.designCode} for submission`}
+                    />
+                  </td>
                   <td className="rate-entry__td rate-entry__td--image">
                     <div className="rate-entry__thumb">
                       <ImageBox
@@ -566,15 +618,17 @@ export default function RateEntryView({
           <div className="rate-entry__submit-info">
             {submittableProducts.length === 0 ? (
               <span className="rate-entry__submit-hint">
-                {user.role === "POL"
-                  ? "Pick a DmCtg for at least one row to enable submission."
-                  : "Pick a difficulty for at least one row to enable submission."}
+                {selectedCount === 0
+                  ? "Check at least one row to submit."
+                  : user.role === "POL"
+                  ? "Selected rows need a valid DmCtg and rates before submitting."
+                  : "Selected rows need a difficulty before submitting."}
               </span>
             ) : (
               <span className="rate-entry__submit-hint">
                 Ready to submit{" "}
-                <strong>{submittableProducts.length}</strong>{" "}
-                {submittableProducts.length === 1 ? "rate" : "rates"}.
+                <strong>{submittableProducts.length}</strong> checked{" "}
+                {submittableProducts.length === 1 ? "row" : "rows"}.
               </span>
             )}
             {submitSummary ? (

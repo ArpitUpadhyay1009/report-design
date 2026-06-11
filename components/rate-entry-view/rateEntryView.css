@@ -159,6 +159,27 @@
   border-bottom: 1px solid #e2e8f0;
 }
 
+.rate-entry__th--check,
+.rate-entry__td--check {
+  width: 44px;
+  text-align: center;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.rate-entry__checkbox {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #4c1d95;
+}
+
+.rate-entry__checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .rate-entry__th--image {
   width: 60px;
 }
@@ -181,6 +202,14 @@
 
 .rate-entry__row:hover {
   background: #fafafa;
+}
+
+.rate-entry__row--selected {
+  background: #f8fafc;
+}
+
+.rate-entry__row--selected:hover {
+  background: #f1f5f9;
 }
 
 .rate-entry__td {
