@@ -421,6 +421,82 @@ export async function fetchPolRatesByUser(
     .filter((r): r is SubmittedPolRate => r !== null);
 }
 
+/** One row from Tbl_Design_Rates where both FIL and POL are COMPLETED. */
+export interface FilledRate {
+  designId: string;
+  difficulty: string;
+  filRate: number;
+  filSubmittedAt?: string;
+  polRate: number;
+  prpRate: number;
+  dhagaRate: number;
+  polSubmittedAt?: string;
+  dmCtg?: string;
+}
+
+interface FilledRateRow {
+  design_id?: string | null;
+  difficulty?: string | null;
+  fil_rate?: string | null;
+  fil_submitted_at?: string | null;
+  pol_rate?: string | null;
+  prp_rate?: string | null;
+  dhaga_rate?: string | null;
+  pol_submitted_at?: string | null;
+  dm_ctg?: string | null;
+  DmCtg?: string | null;
+}
+
+interface FilledRatesResponse {
+  status: string;
+  data: FilledRateRow[];
+  total?: number;
+  message?: string;
+}
+
+/**
+ * Designs where fil_status and pol_status are both COMPLETED — used to
+ * populate the manager's rate-entry queue and read-only FIL/POL columns.
+ */
+export async function fetchFilledRates(): Promise<FilledRate[]> {
+  const response = await apiClient.post<FilledRatesResponse>(
+    "/get-Filled-Rates"
+  );
+  const list = response.data?.data ?? [];
+  return list
+    .map<FilledRate | null>((row) => {
+      const designId = (row?.design_id ?? "").trim();
+      const difficulty = (row?.difficulty ?? "").trim();
+      const filRate = parseNullableRate(row?.fil_rate);
+      const polRate = parseNullableRate(row?.pol_rate);
+      const prpRate = parseNullableRate(row?.prp_rate);
+      const dhagaRate = parseNullableRate(row?.dhaga_rate);
+      const dmCtg = (row?.dm_ctg ?? row?.DmCtg ?? "").trim() || undefined;
+      if (
+        !designId ||
+        !difficulty ||
+        filRate === null ||
+        polRate === null ||
+        prpRate === null ||
+        dhagaRate === null
+      ) {
+        return null;
+      }
+      return {
+        designId,
+        difficulty,
+        filRate,
+        filSubmittedAt: row?.fil_submitted_at ?? undefined,
+        polRate,
+        prpRate,
+        dhagaRate,
+        polSubmittedAt: row?.pol_submitted_at ?? undefined,
+        dmCtg,
+      };
+    })
+    .filter((r): r is FilledRate => r !== null);
+}
+
 // ---------------------------------------------------------------------------
 // Login (POST /report-login)
 // ---------------------------------------------------------------------------

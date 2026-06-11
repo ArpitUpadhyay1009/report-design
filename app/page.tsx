@@ -8,21 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchDesignApprovals,
   fetchDifficultyHeaders,
-  fetchFilRatesByUser,
+  fetchFilledRates,
   fetchPolRates,
-  fetchPolRatesByUser,
   type DifficultyRate,
+  type FilledRate,
   type PolRate,
-  type SubmittedFilRate,
-  type SubmittedPolRate,
 } from "@/services/api";
 import type { LoadState } from "@/components/products-report/productsReport";
-
-// Hard-coded for now: the manager always pulls FIL submissions from this
-// FIL user and POL submissions from this POL user. Swap to a dynamic
-// lookup if/when the backend exposes "all submitters".
-const FIL_USER_ID_FOR_MANAGER = "2";
-const POL_USER_ID_FOR_MANAGER = "1";
 
 export type RateDataStatus = "idle" | "loading" | "ready" | "error";
 
@@ -40,12 +32,7 @@ export default function Home() {
   const [load, setLoad] = useState<LoadState>({ status: "idle" });
   const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
   const [polRates, setPolRates] = useState<PolRate[]>([]);
-  const [submittedFilRates, setSubmittedFilRates] = useState<
-    SubmittedFilRate[]
-  >([]);
-  const [submittedPolRates, setSubmittedPolRates] = useState<
-    SubmittedPolRate[]
-  >([]);
+  const [filledRates, setFilledRates] = useState<FilledRate[]>([]);
   const [rateDataStatus, setRateDataStatus] = useState<RateDataStatus>("idle");
   const [refetchKey, setRefetchKey] = useState(0);
 
@@ -67,8 +54,7 @@ export default function Home() {
     setRateDataStatus("idle");
     setDifficultyRates([]);
     setPolRates([]);
-    setSubmittedFilRates([]);
-    setSubmittedPolRates([]);
+    setFilledRates([]);
   }, [user]);
 
   // Fetch designs whenever user, dates, or a manual retry changes.
@@ -144,16 +130,11 @@ export default function Home() {
         setPolRates(pols);
       }
       if (user.role === "MANAGER") {
-        // Sequentially pull what FIL and POL have submitted so the manager's
-        // read-only sections can be filled in. Stays sequential because the
-        // server has had timeout issues with parallel calls.
-        const filSubs = await fetchFilRatesByUser(FIL_USER_ID_FOR_MANAGER);
+        // Designs where both FIL and POL are COMPLETED — drives which rows
+        // the manager sees and what goes in the read-only FIL/POL columns.
+        const filled = await fetchFilledRates();
         if (sessionRef.current !== session) return;
-        setSubmittedFilRates(filSubs);
-
-        const polSubs = await fetchPolRatesByUser(POL_USER_ID_FOR_MANAGER);
-        if (sessionRef.current !== session) return;
-        setSubmittedPolRates(polSubs);
+        setFilledRates(filled);
       }
       if (sessionRef.current !== session) return;
       rateStatusRef.current = "ready";
@@ -204,8 +185,7 @@ export default function Home() {
           difficultyHeaders={difficultyHeaders}
           difficultyRates={difficultyRates}
           polRates={polRates}
-          submittedFilRates={submittedFilRates}
-          submittedPolRates={submittedPolRates}
+          filledRates={filledRates}
           rateDataStatus={rateDataStatus}
           onLoadRateData={loadRateData}
         />

@@ -7,9 +7,8 @@ import RateEntryView from "@/components/rate-entry-view/rateEntryView";
 import StatCard from "@/components/stat-card/statCard";
 import type {
   DifficultyRate,
+  FilledRate,
   PolRate,
-  SubmittedFilRate,
-  SubmittedPolRate,
 } from "@/services/api";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
@@ -43,8 +42,7 @@ interface ProductsReportProps {
   difficultyHeaders?: string[];
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
-  submittedFilRates?: SubmittedFilRate[];
-  submittedPolRates?: SubmittedPolRate[];
+  filledRates?: FilledRate[];
   rateDataStatus?: RateDataStatus;
   onLoadRateData?: () => void;
 }
@@ -66,8 +64,7 @@ export default function ProductsReport({
   difficultyHeaders,
   difficultyRates,
   polRates,
-  submittedFilRates,
-  submittedPolRates,
+  filledRates,
   rateDataStatus = "idle",
   onLoadRateData,
 }: ProductsReportProps) {
@@ -358,8 +355,7 @@ export default function ProductsReport({
                 difficultyOptions={difficultyHeaders}
                 difficultyRates={difficultyRates}
                 polRates={polRates}
-                submittedFilRates={submittedFilRates}
-                submittedPolRates={submittedPolRates}
+                filledRates={filledRates}
               />
             ) : rateDataStatus === "error" ? (
               <RateDataError onRetry={() => onLoadRateData?.()} />
@@ -481,7 +477,7 @@ function RateDataLoading() {
       <div className="products-report__rate-spinner" aria-hidden="true" />
       <p className="products-report__rate-title">Loading rate data…</p>
       <p className="products-report__rate-subtitle">
-        Fetching difficulty headers and POL rates one at a time.
+        Fetching rate data for your role.
       </p>
     </div>
   );

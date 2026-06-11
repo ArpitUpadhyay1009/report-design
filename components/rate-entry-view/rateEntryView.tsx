@@ -10,10 +10,9 @@ import {
   type DifficultyRate,
   type FilRateResponse,
   type ManagerRateResponse,
+  type FilledRate,
   type PolRate,
   type PolRateResponse,
-  type SubmittedFilRate,
-  type SubmittedPolRate,
 } from "@/services/api";
 import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
@@ -44,8 +43,7 @@ interface RateEntryViewProps {
   difficultyOptions?: string[];
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
-  submittedFilRates?: SubmittedFilRate[];
-  submittedPolRates?: SubmittedPolRate[];
+  filledRates?: FilledRate[];
 }
 
 const inr = (n: number): string =>
@@ -80,6 +78,28 @@ const custTone = (custType: Product["custType"]): "amber" | "violet" | "emerald"
   return "rose";
 };
 
+/** Build a display row for manager rate entry from get-Filled-Rates. */
+function productForFilledRate(filled: FilledRate, existing?: Product): Product {
+  if (existing) return existing;
+  return {
+    id: `filled__${filled.designId}`,
+    designCode: filled.designId,
+    managerName: "—",
+    managerShort: "—",
+    custType: "O",
+    numberOfParts: 0,
+    manufacturer: "—",
+    dep: "—",
+    polCtg: filled.dmCtg ?? "—",
+    difficulty: filled.difficulty,
+    filRate: filled.filRate,
+    polRate: filled.polRate,
+    prpRate: filled.prpRate,
+    dhagaRate: filled.dhagaRate,
+    custCode: "—",
+  };
+}
+
 export default function RateEntryView({
   products,
   user,
@@ -88,10 +108,29 @@ export default function RateEntryView({
   difficultyOptions,
   difficultyRates,
   polRates,
-  submittedFilRates,
-  submittedPolRates,
+  filledRates,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
+
+  const filledByDesign = useMemo(() => {
+    const map = new Map<string, FilledRate>();
+    (filledRates ?? []).forEach((r) => map.set(r.designId, r));
+    return map;
+  }, [filledRates]);
+
+  // Manager rows come from get-Filled-Rates, not the date-filtered design
+  // list. When a filled design also exists in `products`, we merge in the
+  // richer card/table fields (image, manager, cust type, etc.).
+  const displayProducts = useMemo(() => {
+    if (user.role !== "MANAGER") return products;
+    if (!filledRates?.length) return [];
+    const productByDesign = new Map(
+      products.map((p) => [p.designCode, p] as const)
+    );
+    return filledRates.map((filled) =>
+      productForFilledRate(filled, productByDesign.get(filled.designId))
+    );
+  }, [user.role, products, filledRates]);
   const editableSection: RateRole | null =
     user.role === "POL"
       ? "POL"
@@ -125,20 +164,6 @@ export default function RateEntryView({
     const codes = (polRates ?? []).map((r) => r.category).filter(Boolean);
     return Array.from(new Set(codes)).sort();
   }, [polRates]);
-
-  // Manager-only: design-id -> submitted FIL/POL row, used to fill the
-  // read-only FIL Entry / POL Entry sections.
-  const submittedFilByDesign = useMemo(() => {
-    const map = new Map<string, SubmittedFilRate>();
-    (submittedFilRates ?? []).forEach((r) => map.set(r.designId, r));
-    return map;
-  }, [submittedFilRates]);
-
-  const submittedPolByDesign = useMemo(() => {
-    const map = new Map<string, SubmittedPolRate>();
-    (submittedPolRates ?? []).forEach((r) => map.set(r.designId, r));
-    return map;
-  }, [submittedPolRates]);
 
   const buildFilRateLookup = (custType: string): FilRateLookup => {
     return (code: string): number | undefined => {
@@ -249,17 +274,18 @@ export default function RateEntryView({
 
   const submittableProducts = useMemo(
     () =>
-      products.filter((p) => selectedIds.has(p.id) && isProductValid(p)),
-    [products, selectedIds, isProductValid]
+      displayProducts.filter((p) => selectedIds.has(p.id) && isProductValid(p)),
+    [displayProducts, selectedIds, isProductValid]
   );
 
   const selectedCount = useMemo(
-    () => products.filter((p) => selectedIds.has(p.id)).length,
-    [products, selectedIds]
+    () => displayProducts.filter((p) => selectedIds.has(p.id)).length,
+    [displayProducts, selectedIds]
   );
 
   const allSelected =
-    products.length > 0 && products.every((p) => selectedIds.has(p.id));
+    displayProducts.length > 0 &&
+    displayProducts.every((p) => selectedIds.has(p.id));
 
   const toggleRow = useCallback((productId: string, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -272,12 +298,12 @@ export default function RateEntryView({
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
-      if (products.length === 0) return prev;
-      const everySelected = products.every((p) => prev.has(p.id));
+      if (displayProducts.length === 0) return prev;
+      const everySelected = displayProducts.every((p) => prev.has(p.id));
       if (everySelected) return new Set();
-      return new Set(products.map((p) => p.id));
+      return new Set(displayProducts.map((p) => p.id));
     });
-  }, [products]);
+  }, [displayProducts]);
 
   const handleSubmit = useCallback(async () => {
     if (submitting || submittableProducts.length === 0) return;
@@ -464,7 +490,7 @@ export default function RateEntryView({
                   className="rate-entry__checkbox"
                   checked={allSelected}
                   onChange={toggleSelectAll}
-                  disabled={submitting || products.length === 0}
+                  disabled={submitting || displayProducts.length === 0}
                   aria-label="Select all rows"
                   title="Select all rows"
                 />
@@ -478,7 +504,23 @@ export default function RateEntryView({
             </tr>
           </thead>
           <tbody>
-            {products.map((p) => {
+            {displayProducts.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={
+                    4 + sections.reduce((n, s) => n + colsPerSection[s], 0)
+                  }
+                  className="rate-entry__empty-row"
+                >
+                  {user.role === "MANAGER"
+                    ? filledRates?.length
+                      ? "Filled rates were loaded but none could be displayed. Try refreshing."
+                      : "No designs are ready for manager review yet. FIL and POL must both be completed."
+                    : "No designs to show."}
+                </td>
+              </tr>
+            ) : null}
+            {displayProducts.map((p) => {
               const productEntries = entries[p.id] ?? {};
               const rowStatus = rowStatuses[p.id];
               const rowMessage = rowMessages[p.id];
@@ -531,48 +573,37 @@ export default function RateEntryView({
                     const ownEntry = productEntries[s] ?? {};
                     const isEditable = s === editableSection;
 
-                    // Manager's read-only FIL / POL sections fall back to what
-                    // those users have actually submitted, fetched from the
-                    // by-user endpoints.
+                    // Manager's read-only FIL / POL columns come from
+                    // get-Filled-Rates (Tbl_Design_Rates, both stages COMPLETED).
                     let sectionEntry: RateEntry = ownEntry;
+                    const filled = filledByDesign.get(p.designCode);
                     if (
                       user.role === "MANAGER" &&
                       !isEditable &&
-                      s === "FIL"
+                      filled
                     ) {
-                      const submitted = submittedFilByDesign.get(p.designCode);
-                      if (submitted) {
+                      if (s === "FIL") {
                         sectionEntry = {
                           ...ownEntry,
-                          difficulty:
-                            ownEntry.difficulty ?? submitted.difficulty,
-                          filRate: ownEntry.filRate ?? submitted.filRate,
+                          difficulty: filled.difficulty,
+                          filRate: filled.filRate,
                         };
-                      }
-                    } else if (
-                      user.role === "MANAGER" &&
-                      !isEditable &&
-                      s === "POL"
-                    ) {
-                      const submitted = submittedPolByDesign.get(p.designCode);
-                      if (submitted) {
+                      } else if (s === "POL") {
                         sectionEntry = {
                           ...ownEntry,
-                          polRate: ownEntry.polRate ?? submitted.polRate,
-                          prpRate: ownEntry.prpRate ?? submitted.prpRate,
-                          dhagaRate:
-                            ownEntry.dhagaRate ?? submitted.dhagaRate,
+                          dmCtg: filled.dmCtg,
+                          polRate: filled.polRate,
+                          prpRate: filled.prpRate,
+                          dhagaRate: filled.dhagaRate,
                         };
                       }
                     }
 
-                    // POL section in manager's read-only view stays empty until
-                    // real POL data arrives — don't pre-fill from the design.
                     const effectiveDmCtg =
                       s === "FIL"
                         ? p.polCtg
                         : sectionEntry.dmCtg ??
-                          (isEditable ? p.polCtg : "");
+                          (isEditable ? p.polCtg : filled?.dmCtg ?? "");
 
                     // For the POL section's three rate cells:
                     //   - editable (POL user / MANAGER): derive from DmCtg+custType.

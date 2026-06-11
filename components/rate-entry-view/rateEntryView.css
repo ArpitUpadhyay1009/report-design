@@ -196,6 +196,14 @@
   background: #ecfdf5 !important;
 }
 
+.rate-entry__empty-row {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
 .rate-entry__row {
   transition: background 120ms ease;
 }
