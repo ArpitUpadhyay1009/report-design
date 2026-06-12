@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ProductCard from "@/components/product-card/productCard";
 import ProductRow from "@/components/product-row/productRow";
 import RateEntryView from "@/components/rate-entry-view/rateEntryView";
@@ -47,6 +47,8 @@ interface ProductsReportProps {
   onLoadRateData?: () => void;
 }
 
+const PAGE_SIZE = 10;
+
 const inr = (n: number): string =>
   new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: 2,
@@ -70,6 +72,7 @@ export default function ProductsReport({
 }: ProductsReportProps) {
   const [view, setView] = useState<ViewMode>("table");
   const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [rateEntries, setRateEntries] = useState<RateEntries>({});
 
   const products = useMemo<Product[]>(
@@ -113,6 +116,23 @@ export default function ProductsReport({
         p.manufacturer.toLowerCase().includes(q)
     );
   }, [products, query]);
+
+  // Reset pagination when the underlying list or filters change.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [products, query, fromDate, toDate]);
+
+  const visibleProducts = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  );
+
+  const hasMore = visibleCount < filtered.length;
+  const remainingCount = filtered.length - visibleCount;
+
+  const handleShowMore = useCallback(() => {
+    setVisibleCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
+  }, [filtered.length]);
 
   const stats = useMemo(() => {
     const totals = products.map(totalRate);
@@ -341,7 +361,17 @@ export default function ProductsReport({
         <>
           {view !== "entry" ? (
             <div className="products-report__result-meta">
-              Showing <strong>{filtered.length}</strong> of {products.length} designs
+              Showing{" "}
+              <strong>{Math.min(visibleCount, filtered.length)}</strong> of{" "}
+              <strong>{filtered.length}</strong> designs
+              {query ? (
+                <>
+                  {" "}
+                  <span className="products-report__result-meta-muted">
+                    (filtered from {products.length})
+                  </span>
+                </>
+              ) : null}
             </div>
           ) : null}
 
@@ -379,51 +409,98 @@ export default function ProductsReport({
               )}
             </div>
           ) : view === "grid" ? (
-            <div className="products-report__grid">
-              {filtered.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
+            <>
+              <div className="products-report__grid">
+                {visibleProducts.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+              {hasMore ? (
+                <ShowMoreBar
+                  remaining={remainingCount}
+                  pageSize={PAGE_SIZE}
+                  onShowMore={handleShowMore}
+                />
+              ) : null}
+            </>
           ) : (
-            <div className="products-report__table-wrap">
-              <table className="products-report__table">
-                <thead>
-                  <tr>
-                    <th rowSpan={2}>Image</th>
-                    <th rowSpan={2}>Design</th>
-                    <th rowSpan={2}>Manager</th>
-                    <th rowSpan={2}>Cust</th>
-                    <th rowSpan={2}>Parts</th>
-                    <th colSpan={3} className="products-report__th-group">
-                      As per standard norms
-                    </th>
-                    <th colSpan={5} className="products-report__th-group products-report__th-group--accent">
-                      System rate
-                    </th>
-                    <th rowSpan={2} className="products-report__th-total">Total</th>
-                  </tr>
-                  <tr>
-                    <th>MFR</th>
-                    <th>Dep</th>
-                    <th>POL CTG</th>
-                    <th>Diff</th>
-                    <th>FIL</th>
-                    <th>POL</th>
-                    <th>PRP</th>
-                    <th>DHAGA</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((p) => (
-                    <ProductRow key={p.id} product={p} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="products-report__table-wrap">
+                <table className="products-report__table">
+                  <thead>
+                    <tr>
+                      <th rowSpan={2}>Image</th>
+                      <th rowSpan={2}>Design</th>
+                      <th rowSpan={2}>Manager</th>
+                      <th rowSpan={2}>Cust</th>
+                      <th rowSpan={2}>Parts</th>
+                      <th colSpan={3} className="products-report__th-group">
+                        As per standard norms
+                      </th>
+                      <th
+                        colSpan={5}
+                        className="products-report__th-group products-report__th-group--accent"
+                      >
+                        System rate
+                      </th>
+                      <th rowSpan={2} className="products-report__th-total">
+                        Total
+                      </th>
+                    </tr>
+                    <tr>
+                      <th>MFR</th>
+                      <th>Dep</th>
+                      <th>POL CTG</th>
+                      <th>Diff</th>
+                      <th>FIL</th>
+                      <th>POL</th>
+                      <th>PRP</th>
+                      <th>DHAGA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleProducts.map((p) => (
+                      <ProductRow key={p.id} product={p} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {hasMore ? (
+                <ShowMoreBar
+                  remaining={remainingCount}
+                  pageSize={PAGE_SIZE}
+                  onShowMore={handleShowMore}
+                />
+              ) : null}
+            </>
           )}
         </>
       )}
     </section>
+  );
+}
+
+interface ShowMoreBarProps {
+  remaining: number;
+  pageSize: number;
+  onShowMore: () => void;
+}
+
+function ShowMoreBar({ remaining, pageSize, onShowMore }: ShowMoreBarProps) {
+  const loadCount = Math.min(pageSize, remaining);
+  return (
+    <div className="products-report__show-more">
+      <button
+        type="button"
+        className="products-report__show-more-btn"
+        onClick={onShowMore}
+      >
+        Show {loadCount} more
+      </button>
+      <span className="products-report__show-more-meta">
+        {remaining} remaining
+      </span>
+    </div>
   );
 }
 

@@ -185,6 +185,43 @@
   color: #0f172a;
 }
 
+.products-report__result-meta-muted {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.products-report__show-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.products-report__show-more-btn {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #4c1d95;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.products-report__show-more-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.products-report__show-more-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
 .products-report__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
