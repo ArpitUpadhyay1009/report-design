@@ -454,6 +454,39 @@ interface FilledRatesResponse {
   message?: string;
 }
 
+interface CompletedDesignIdRow {
+  design_id?: string | null;
+}
+
+interface CompletedDesignIdsResponse {
+  status: string;
+  data: CompletedDesignIdRow[];
+  total?: number;
+  message?: string;
+}
+
+function mapCompletedDesignIds(rows: CompletedDesignIdRow[]): string[] {
+  return rows
+    .map((row) => (row?.design_id ?? "").trim())
+    .filter(Boolean);
+}
+
+/** design_ids where fil_status = COMPLETED (FIL rate entry). */
+export async function fetchCompletedFilDesignIds(): Promise<string[]> {
+  const response = await apiClient.post<CompletedDesignIdsResponse>(
+    "/get-completed-fil"
+  );
+  return mapCompletedDesignIds(response.data?.data ?? []);
+}
+
+/** design_ids where pol_status = COMPLETED (POL rate entry). */
+export async function fetchCompletedPolDesignIds(): Promise<string[]> {
+  const response = await apiClient.post<CompletedDesignIdsResponse>(
+    "/get-completed-pol"
+  );
+  return mapCompletedDesignIds(response.data?.data ?? []);
+}
+
 /**
  * Designs where fil_status and pol_status are both COMPLETED — used to
  * populate the manager's rate-entry queue and read-only FIL/POL columns.

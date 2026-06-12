@@ -43,6 +43,8 @@ interface ProductsReportProps {
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
   filledRates?: FilledRate[];
+  completedFilDesignIds?: string[];
+  completedPolDesignIds?: string[];
   rateDataStatus?: RateDataStatus;
   onLoadRateData?: () => void;
 }
@@ -67,6 +69,8 @@ export default function ProductsReport({
   difficultyRates,
   polRates,
   filledRates,
+  completedFilDesignIds,
+  completedPolDesignIds,
   rateDataStatus = "idle",
   onLoadRateData,
 }: ProductsReportProps) {
@@ -386,6 +390,8 @@ export default function ProductsReport({
                 difficultyRates={difficultyRates}
                 polRates={polRates}
                 filledRates={filledRates}
+                completedFilDesignIds={completedFilDesignIds}
+                completedPolDesignIds={completedPolDesignIds}
               />
             ) : rateDataStatus === "error" ? (
               <RateDataError onRetry={() => onLoadRateData?.()} />

@@ -220,6 +220,26 @@
   background: #f1f5f9;
 }
 
+.rate-entry__row--stage-completed {
+  background: #f0fdf4;
+}
+
+.rate-entry__row--stage-completed:hover {
+  background: #ecfdf5;
+}
+
+.rate-entry__completed {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #047857;
+  background: #d1fae5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
 .rate-entry__td {
   padding: 8px 12px;
   border-bottom: 1px solid #f1f5f9;

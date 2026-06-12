@@ -44,6 +44,8 @@ interface RateEntryViewProps {
   difficultyRates?: DifficultyRate[];
   polRates?: PolRate[];
   filledRates?: FilledRate[];
+  completedFilDesignIds?: string[];
+  completedPolDesignIds?: string[];
 }
 
 const inr = (n: number): string =>
@@ -109,8 +111,28 @@ export default function RateEntryView({
   difficultyRates,
   polRates,
   filledRates,
+  completedFilDesignIds,
+  completedPolDesignIds,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
+
+  const completedFilSet = useMemo(
+    () => new Set(completedFilDesignIds ?? []),
+    [completedFilDesignIds]
+  );
+  const completedPolSet = useMemo(
+    () => new Set(completedPolDesignIds ?? []),
+    [completedPolDesignIds]
+  );
+
+  const isStageCompleted = useCallback(
+    (designCode: string): boolean => {
+      if (user.role === "FIL") return completedFilSet.has(designCode);
+      if (user.role === "POL") return completedPolSet.has(designCode);
+      return false;
+    },
+    [user.role, completedFilSet, completedPolSet]
+  );
 
   const filledByDesign = useMemo(() => {
     const map = new Map<string, FilledRate>();
@@ -213,6 +235,7 @@ export default function RateEntryView({
 
   const isProductValid = useCallback(
     (p: Product): boolean => {
+      if (isStageCompleted(p.designCode)) return false;
       if (user.role === "FIL") {
         const e = entries[p.id]?.FIL;
         return (
@@ -269,7 +292,7 @@ export default function RateEntryView({
       }
       return false;
     },
-    [user.role, entries, polRatesByCategory]
+    [user.role, entries, polRatesByCategory, isStageCompleted]
   );
 
   const submittableProducts = useMemo(
@@ -525,10 +548,12 @@ export default function RateEntryView({
               const rowStatus = rowStatuses[p.id];
               const rowMessage = rowMessages[p.id];
               const isSelected = selectedIds.has(p.id);
+              const stageCompleted = isStageCompleted(p.designCode);
               const rowClass = [
                 "rate-entry__row",
                 rowStatus ? `rate-entry__row--${rowStatus}` : "",
                 isSelected ? "rate-entry__row--selected" : "",
+                stageCompleted ? "rate-entry__row--stage-completed" : "",
               ]
                 .filter(Boolean)
                 .join(" ");
@@ -540,7 +565,7 @@ export default function RateEntryView({
                       className="rate-entry__checkbox"
                       checked={isSelected}
                       onChange={(e) => toggleRow(p.id, e.target.checked)}
-                      disabled={submitting}
+                      disabled={submitting || stageCompleted}
                       aria-label={`Select ${p.designCode} for submission`}
                     />
                   </td>
@@ -623,6 +648,7 @@ export default function RateEntryView({
                         key={s}
                         section={s}
                         editable={isEditable}
+                        stageCompleted={isEditable && stageCompleted}
                         entry={sectionEntry}
                         onPatch={(patch) => onChange(p.id, s, patch)}
                         difficultyCodes={
@@ -755,6 +781,7 @@ function renderSectionHeaders(section: RateRole) {
 interface SectionCellsProps {
   section: RateRole;
   editable: boolean;
+  stageCompleted?: boolean;
   entry: RateEntry;
   onPatch: (patch: Partial<RateEntry>) => void;
   difficultyCodes: string[];
@@ -767,6 +794,7 @@ interface SectionCellsProps {
 function SectionCells({
   section,
   editable,
+  stageCompleted = false,
   entry,
   onPatch,
   difficultyCodes,
@@ -781,15 +809,20 @@ function SectionCells({
     return (
       <>
         <td className={tdClass}>
-          <DifficultyDropdown
-            codes={difficultyCodes}
-            value={entry.difficulty}
-            disabled={!editable}
-            onSelect={(code) => {
-              const filRate = code === undefined ? undefined : getFilRate(code);
-              onPatch({ difficulty: code, filRate });
-            }}
-          />
+          {stageCompleted ? (
+            <CompletedLabel />
+          ) : (
+            <DifficultyDropdown
+              codes={difficultyCodes}
+              value={entry.difficulty}
+              disabled={!editable}
+              onSelect={(code) => {
+                const filRate =
+                  code === undefined ? undefined : getFilRate(code);
+                onPatch({ difficulty: code, filRate });
+              }}
+            />
+          )}
         </td>
         <td className={`${tdClass} rate-entry__td--num`}>
           {entry.filRate !== undefined ? inr(entry.filRate) : <span className="rate-entry__placeholder">—</span>}
@@ -806,12 +839,16 @@ function SectionCells({
     return (
       <>
         <td className={tdClass}>
-          <DifficultyDropdown
-            codes={dropdownCodes}
-            value={dmCtgValue}
-            disabled={!editable}
-            onSelect={(code) => onPatch({ dmCtg: code })}
-          />
+          {stageCompleted ? (
+            <CompletedLabel />
+          ) : (
+            <DifficultyDropdown
+              codes={dropdownCodes}
+              value={dmCtgValue}
+              disabled={!editable}
+              onSelect={(code) => onPatch({ dmCtg: code })}
+            />
+          )}
         </td>
         <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
         <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
@@ -859,6 +896,10 @@ function SectionCells({
 interface DerivedRateCellProps {
   tdClass: string;
   value: number | undefined;
+}
+
+function CompletedLabel() {
+  return <span className="rate-entry__completed">Completed</span>;
 }
 
 function DerivedRateCell({ tdClass, value }: DerivedRateCellProps) {

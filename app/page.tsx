@@ -6,6 +6,8 @@ import LoginForm from "@/components/login-form/loginForm";
 import ProductsReport from "@/components/products-report/productsReport";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  fetchCompletedFilDesignIds,
+  fetchCompletedPolDesignIds,
   fetchDesignApprovals,
   fetchDifficultyHeaders,
   fetchFilledRates,
@@ -33,6 +35,12 @@ export default function Home() {
   const [difficultyRates, setDifficultyRates] = useState<DifficultyRate[]>([]);
   const [polRates, setPolRates] = useState<PolRate[]>([]);
   const [filledRates, setFilledRates] = useState<FilledRate[]>([]);
+  const [completedFilDesignIds, setCompletedFilDesignIds] = useState<string[]>(
+    []
+  );
+  const [completedPolDesignIds, setCompletedPolDesignIds] = useState<string[]>(
+    []
+  );
   const [rateDataStatus, setRateDataStatus] = useState<RateDataStatus>("idle");
   const [refetchKey, setRefetchKey] = useState(0);
 
@@ -55,6 +63,8 @@ export default function Home() {
     setDifficultyRates([]);
     setPolRates([]);
     setFilledRates([]);
+    setCompletedFilDesignIds([]);
+    setCompletedPolDesignIds([]);
   }, [user]);
 
   // Fetch designs whenever user, dates, or a manual retry changes.
@@ -124,10 +134,20 @@ export default function Home() {
         if (sessionRef.current !== session) return;
         setDifficultyRates(diffs);
       }
+      if (user.role === "FIL") {
+        const completedFil = await fetchCompletedFilDesignIds();
+        if (sessionRef.current !== session) return;
+        setCompletedFilDesignIds(completedFil);
+      }
       if (user.role === "POL" || user.role === "MANAGER") {
         const pols = await fetchPolRates();
         if (sessionRef.current !== session) return;
         setPolRates(pols);
+      }
+      if (user.role === "POL") {
+        const completedPol = await fetchCompletedPolDesignIds();
+        if (sessionRef.current !== session) return;
+        setCompletedPolDesignIds(completedPol);
       }
       if (user.role === "MANAGER") {
         // Designs where both FIL and POL are COMPLETED — drives which rows
@@ -186,6 +206,8 @@ export default function Home() {
           difficultyRates={difficultyRates}
           polRates={polRates}
           filledRates={filledRates}
+          completedFilDesignIds={completedFilDesignIds}
+          completedPolDesignIds={completedPolDesignIds}
           rateDataStatus={rateDataStatus}
           onLoadRateData={loadRateData}
         />
