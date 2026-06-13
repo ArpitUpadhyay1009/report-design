@@ -1,14 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ProductCard from "@/components/product-card/productCard";
+import ProductCard, {
+  type CardRateEntryProps,
+} from "@/components/product-card/productCard";
 import ProductRow from "@/components/product-row/productRow";
 import RateEntryView from "@/components/rate-entry-view/rateEntryView";
 import StatCard from "@/components/stat-card/statCard";
-import type {
-  DifficultyRate,
-  FilledRate,
-  PolRate,
+import { difficulties } from "@/constants/rate";
+import {
+  submitFilRate,
+  submitManagerRate,
+  submitPolRate,
+  type DifficultyRate,
+  type FilledRate,
+  type PolRate,
 } from "@/services/api";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
@@ -18,6 +24,12 @@ import type {
   RateEntry,
   RateRole,
 } from "@/types/rateEntry";
+import {
+  categoryRatesFor,
+  filRateForDifficulty,
+  polCategoryCodesFrom,
+  productForFilledRate,
+} from "@/utils/rateEntryHelpers";
 import "./productsReport.css";
 
 type ViewMode = "grid" | "table" | "entry" | "completed";
@@ -51,6 +63,8 @@ interface ProductsReportProps {
 
 const PAGE_SIZE = 10;
 
+type CardSubmitState = CardRateEntryProps["submitState"];
+
 const inr = (n: number): string =>
   new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: 2,
@@ -78,12 +92,44 @@ export default function ProductsReport({
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [rateEntries, setRateEntries] = useState<RateEntries>({});
+  const [localCompletedFil, setLocalCompletedFil] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [localCompletedPol, setLocalCompletedPol] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [localCompletedManager, setLocalCompletedManager] = useState<
+    Set<string>
+  >(() => new Set());
+  const [cardSubmitStates, setCardSubmitStates] = useState<
+    Record<string, CardSubmitState>
+  >({});
+  const [cardSubmitMessages, setCardSubmitMessages] = useState<
+    Record<string, string>
+  >({});
+
+  const showCardRateEntry =
+    user.role === "FIL" || user.role === "POL" || user.role === "MANAGER";
+
+  const editableRole: RateRole | null =
+    user.role === "FIL"
+      ? "FIL"
+      : user.role === "POL"
+      ? "POL"
+      : user.role === "MANAGER"
+      ? "MANAGER"
+      : null;
 
   const products = useMemo<Product[]>(
     () => (load.status === "success" ? load.products : []),
     [load]
   );
   const hasProducts = load.status === "success";
+
+  const handleOpenGrid = useCallback(() => {
+    setView("grid");
+    if (showCardRateEntry) onLoadRateData?.();
+  }, [onLoadRateData, showCardRateEntry]);
 
   const handleOpenEntry = useCallback(() => {
     setView("entry");
@@ -116,6 +162,52 @@ export default function ProductsReport({
     []
   );
 
+  const completedFilSet = useMemo(
+    () =>
+      new Set([
+        ...(completedFilDesignIds ?? []),
+        ...localCompletedFil,
+      ]),
+    [completedFilDesignIds, localCompletedFil]
+  );
+
+  const completedPolSet = useMemo(
+    () =>
+      new Set([
+        ...(completedPolDesignIds ?? []),
+        ...localCompletedPol,
+      ]),
+    [completedPolDesignIds, localCompletedPol]
+  );
+
+  const filledByDesign = useMemo(() => {
+    const map = new Map<string, FilledRate>();
+    (filledRates ?? []).forEach((r) => map.set(r.designId, r));
+    return map;
+  }, [filledRates]);
+
+  const polRatesByCategory = useMemo(() => {
+    const map = new Map<string, PolRate>();
+    (polRates ?? []).forEach((r) => map.set(r.category, r));
+    return map;
+  }, [polRates]);
+
+  const apiDifficultyCodes = useMemo(() => {
+    if (
+      (user.role === "FIL" || user.role === "MANAGER") &&
+      difficultyHeaders &&
+      difficultyHeaders.length > 0
+    ) {
+      return difficultyHeaders;
+    }
+    return Object.keys(difficulties);
+  }, [user.role, difficultyHeaders]);
+
+  const polCategoryCodes = useMemo(
+    () => polCategoryCodesFrom(polRates ?? []),
+    [polRates]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -129,22 +221,390 @@ export default function ProductsReport({
     );
   }, [products, query]);
 
+  const gridSourceProducts = useMemo(() => {
+    if (!showCardRateEntry) return filtered;
+
+    if (user.role === "MANAGER") {
+      if (!filledRates?.length) return [];
+      const productByDesign = new Map(
+        products.map((p) => [p.designCode, p] as const)
+      );
+      return filledRates
+        .map((filled) =>
+          productForFilledRate(filled, productByDesign.get(filled.designId))
+        )
+        .filter((p) => !localCompletedManager.has(p.designCode))
+        .filter((p) => {
+          const q = query.trim().toLowerCase();
+          if (!q) return true;
+          return (
+            p.designCode.toLowerCase().includes(q) ||
+            p.managerName.toLowerCase().includes(q) ||
+            p.managerShort.toLowerCase().includes(q) ||
+            p.custCode.toLowerCase().includes(q) ||
+            p.manufacturer.toLowerCase().includes(q)
+          );
+        });
+    }
+
+    if (user.role === "FIL") {
+      return filtered.filter((p) => !completedFilSet.has(p.designCode));
+    }
+
+    if (user.role === "POL") {
+      return filtered.filter((p) => !completedPolSet.has(p.designCode));
+    }
+
+    return filtered;
+  }, [
+    showCardRateEntry,
+    user.role,
+    filtered,
+    products,
+    filledRates,
+    localCompletedManager,
+    completedFilSet,
+    completedPolSet,
+    query,
+  ]);
+
+  const activeList =
+    view === "grid" && showCardRateEntry ? gridSourceProducts : filtered;
+
   // Reset pagination when the underlying list or filters change.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [products, query, fromDate, toDate]);
+  }, [products, query, fromDate, toDate, view, activeList.length]);
 
   const visibleProducts = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount]
+    () => activeList.slice(0, visibleCount),
+    [activeList, visibleCount]
   );
 
-  const hasMore = visibleCount < filtered.length;
-  const remainingCount = filtered.length - visibleCount;
+  const hasMore = visibleCount < activeList.length;
+  const remainingCount = activeList.length - visibleCount;
 
   const handleShowMore = useCallback(() => {
-    setVisibleCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
-  }, [filtered.length]);
+    setVisibleCount((n) => Math.min(n + PAGE_SIZE, activeList.length));
+  }, [activeList.length]);
+
+  const isCardProductValid = useCallback(
+    (p: Product): boolean => {
+      if (!editableRole) return false;
+
+      if (user.role === "FIL") {
+        const e = rateEntries[p.id]?.FIL;
+        return (
+          !!e &&
+          typeof e.difficulty === "string" &&
+          e.difficulty.length > 0 &&
+          typeof e.filRate === "number" &&
+          Number.isFinite(e.filRate)
+        );
+      }
+
+      if (user.role === "POL") {
+        const sectionEntry = rateEntries[p.id]?.POL ?? {};
+        const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
+        if (!effectiveDmCtg) return false;
+        const polEntry = polRatesByCategory.get(effectiveDmCtg);
+        if (!polEntry) return false;
+        const isO = p.custType === "O";
+        const isB = p.custType === "B";
+        if (!isO && !isB) return false;
+        const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
+        const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
+        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
+        return (
+          typeof polRate === "number" &&
+          typeof prpRate === "number" &&
+          typeof dhagaRate === "number"
+        );
+      }
+
+      if (user.role === "MANAGER") {
+        const filled = filledByDesign.get(p.designCode);
+        const sectionEntry = rateEntries[p.id]?.MANAGER ?? {};
+        const difficulty = sectionEntry.difficulty ?? filled?.difficulty;
+        const filRate =
+          sectionEntry.filRate ??
+          filled?.filRate ??
+          (difficulty
+            ? filRateForDifficulty(
+                difficultyRates ?? [],
+                difficulty,
+                p.custType
+              )
+            : undefined);
+        if (
+          typeof difficulty !== "string" ||
+          difficulty.length === 0 ||
+          typeof filRate !== "number" ||
+          !Number.isFinite(filRate)
+        ) {
+          return false;
+        }
+        const effectiveDmCtg =
+          sectionEntry.dmCtg ?? p.polCtg ?? filled?.dmCtg ?? "";
+        if (!effectiveDmCtg) return false;
+        const polEntry = polRatesByCategory.get(effectiveDmCtg);
+        if (!polEntry) return false;
+        const isO = p.custType === "O";
+        const isB = p.custType === "B";
+        if (!isO && !isB) return false;
+        const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
+        const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
+        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
+        return (
+          typeof polRate === "number" &&
+          typeof prpRate === "number" &&
+          typeof dhagaRate === "number"
+        );
+      }
+
+      return false;
+    },
+    [editableRole, user.role, rateEntries, polRatesByCategory, filledByDesign, difficultyRates]
+  );
+
+  const handleCardDifficultyChange = useCallback(
+    (product: Product, code: string) => {
+      if (!editableRole || user.role === "POL") return;
+      const role: RateRole = user.role === "MANAGER" ? "MANAGER" : "FIL";
+      const filRate = filRateForDifficulty(
+        difficultyRates ?? [],
+        code,
+        product.custType
+      );
+      handleRateChange(product.id, role, {
+        difficulty: code,
+        filRate,
+      });
+    },
+    [editableRole, user.role, difficultyRates, handleRateChange]
+  );
+
+  const handleCardDmCtgChange = useCallback(
+    (product: Product, code: string) => {
+      if (!editableRole || user.role === "FIL") return;
+      const role: RateRole = user.role === "MANAGER" ? "MANAGER" : "POL";
+      const rates = categoryRatesFor(polRates ?? [], code, product.custType);
+      handleRateChange(product.id, role, {
+        dmCtg: code,
+        polRate: rates.polRate,
+        prpRate: rates.prpRate,
+        dhagaRate: rates.dhagaRate,
+      });
+    },
+    [editableRole, user.role, polRates, handleRateChange]
+  );
+
+  const handleCardSubmit = useCallback(
+    async (product: Product) => {
+      if (!editableRole || !user.userId) return;
+      if (!isCardProductValid(product)) return;
+      if (cardSubmitStates[product.id] === "submitting") return;
+
+      setCardSubmitStates((s) => ({ ...s, [product.id]: "submitting" }));
+      setCardSubmitMessages((m) => {
+        const next = { ...m };
+        delete next[product.id];
+        return next;
+      });
+
+      try {
+        if (user.role === "FIL") {
+          const e = rateEntries[product.id]!.FIL!;
+          const result = await submitFilRate({
+            user_id: user.userId,
+            design_id: product.designCode,
+            difficulty: e.difficulty as string,
+            fil_rate: e.filRate as number,
+          });
+          if (result.status === "1") {
+            setLocalCompletedFil((prev) =>
+              new Set([...prev, product.designCode])
+            );
+            setCardSubmitStates((s) => ({ ...s, [product.id]: "done" }));
+          } else {
+            const message = Array.isArray(result.message)
+              ? result.message.join(", ")
+              : result.message;
+            setCardSubmitStates((s) => ({ ...s, [product.id]: "error" }));
+            setCardSubmitMessages((m) => ({
+              ...m,
+              [product.id]: message,
+            }));
+          }
+        } else if (user.role === "POL") {
+          const sectionEntry = rateEntries[product.id]?.POL ?? {};
+          const effectiveDmCtg = sectionEntry.dmCtg ?? product.polCtg;
+          const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
+          const isO = product.custType === "O";
+          const result = await submitPolRate({
+            user_id: user.userId,
+            design_id: product.designCode,
+            pol_rate: (isO ? polEntry.normalPol : polEntry.brandPol) as number,
+            prp_rate: (isO ? polEntry.normalPrp : polEntry.brandPrp) as number,
+            dhaga_rate: (isO
+              ? polEntry.normalDhaga
+              : polEntry.brandDhaga) as number,
+          });
+          if (result.status === "1") {
+            setLocalCompletedPol((prev) =>
+              new Set([...prev, product.designCode])
+            );
+            setCardSubmitStates((s) => ({ ...s, [product.id]: "done" }));
+          } else {
+            const message = Array.isArray(result.message)
+              ? result.message.join(", ")
+              : result.message;
+            setCardSubmitStates((s) => ({ ...s, [product.id]: "error" }));
+            setCardSubmitMessages((m) => ({
+              ...m,
+              [product.id]: message,
+            }));
+          }
+        } else if (user.role === "MANAGER") {
+          const filled = filledByDesign.get(product.designCode);
+          const sectionEntry = rateEntries[product.id]?.MANAGER ?? {};
+          const difficulty = sectionEntry.difficulty ?? filled?.difficulty;
+          const filRate =
+            sectionEntry.filRate ??
+            filled?.filRate ??
+            (difficulty
+              ? filRateForDifficulty(
+                  difficultyRates ?? [],
+                  difficulty,
+                  product.custType
+                )
+              : undefined);
+          const effectiveDmCtg =
+            sectionEntry.dmCtg ?? product.polCtg ?? filled?.dmCtg ?? "";
+          const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
+          const isO = product.custType === "O";
+          const result = await submitManagerRate({
+            user_id: user.userId,
+            design_id: product.designCode,
+            difficulty: difficulty as string,
+            manager_fil_rate: filRate as number,
+            manager_pol_rate: (isO
+              ? polEntry.normalPol
+              : polEntry.brandPol) as number,
+            manager_prp_rate: (isO
+              ? polEntry.normalPrp
+              : polEntry.brandPrp) as number,
+            manager_dhaga_rate: (isO
+              ? polEntry.normalDhaga
+              : polEntry.brandDhaga) as number,
+          });
+          if (result.status === "1") {
+            setLocalCompletedManager((prev) =>
+              new Set([...prev, product.designCode])
+            );
+            setCardSubmitStates((s) => ({ ...s, [product.id]: "done" }));
+          } else {
+            const message = Array.isArray(result.message)
+              ? result.message.join(", ")
+              : result.message;
+            setCardSubmitStates((s) => ({ ...s, [product.id]: "error" }));
+            setCardSubmitMessages((m) => ({
+              ...m,
+              [product.id]: message,
+            }));
+          }
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Submission failed.";
+        setCardSubmitStates((s) => ({ ...s, [product.id]: "error" }));
+        setCardSubmitMessages((m) => ({ ...m, [product.id]: message }));
+      }
+    },
+    [
+      editableRole,
+      user.userId,
+      user.role,
+      isCardProductValid,
+      cardSubmitStates,
+      rateEntries,
+      polRatesByCategory,
+      filledByDesign,
+      difficultyRates,
+    ]
+  );
+
+  const buildCardRateEntry = useCallback(
+    (product: Product): CardRateEntryProps | undefined => {
+      if (!showCardRateEntry || !editableRole || rateDataStatus !== "ready") {
+        return undefined;
+      }
+
+      const filled = filledByDesign.get(product.designCode);
+      const sectionEntry = rateEntries[product.id]?.[editableRole] ?? {};
+      const difficulty =
+        sectionEntry.difficulty ??
+        (user.role === "MANAGER" ? filled?.difficulty : undefined);
+      const dmCtg =
+        sectionEntry.dmCtg ?? product.polCtg ?? filled?.dmCtg ?? "";
+      const filRate =
+        sectionEntry.filRate ??
+        (difficulty
+          ? filRateForDifficulty(
+              difficultyRates ?? [],
+              difficulty,
+              product.custType
+            )
+          : undefined);
+      const polRatesResolved =
+        user.role === "POL" || user.role === "MANAGER"
+          ? sectionEntry.polRate !== undefined
+            ? {
+                polRate: sectionEntry.polRate,
+                prpRate: sectionEntry.prpRate,
+                dhagaRate: sectionEntry.dhagaRate,
+              }
+            : categoryRatesFor(polRates ?? [], dmCtg, product.custType)
+          : {};
+
+      return {
+        role: user.role,
+        difficultyOptions: apiDifficultyCodes,
+        polCategoryCodes,
+        difficulty,
+        dmCtg,
+        filRate,
+        polRate: polRatesResolved.polRate,
+        prpRate: polRatesResolved.prpRate,
+        dhagaRate: polRatesResolved.dhagaRate,
+        onDifficultyChange: (code) =>
+          handleCardDifficultyChange(product, code),
+        onDmCtgChange: (code) => handleCardDmCtgChange(product, code),
+        onSubmit: () => handleCardSubmit(product),
+        canSubmit: isCardProductValid(product),
+        submitState: cardSubmitStates[product.id] ?? "idle",
+        submitMessage: cardSubmitMessages[product.id],
+      };
+    },
+    [
+      showCardRateEntry,
+      editableRole,
+      rateDataStatus,
+      filledByDesign,
+      rateEntries,
+      user.role,
+      difficultyRates,
+      polRates,
+      apiDifficultyCodes,
+      polCategoryCodes,
+      handleCardDifficultyChange,
+      handleCardDmCtgChange,
+      handleCardSubmit,
+      isCardProductValid,
+      cardSubmitStates,
+      cardSubmitMessages,
+    ]
+  );
 
   const stats = useMemo(() => {
     const totals = products.map(totalRate);
@@ -309,7 +769,7 @@ export default function ProductsReport({
             className={`products-report__view${
               view === "grid" ? " products-report__view--active" : ""
             }`}
-            onClick={() => setView("grid")}
+            onClick={handleOpenGrid}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
               <path
@@ -396,17 +856,55 @@ export default function ProductsReport({
         <>
           {view !== "entry" && view !== "completed" ? (
             <div className="products-report__result-meta">
-              Showing{" "}
-              <strong>{Math.min(visibleCount, filtered.length)}</strong> of{" "}
-              <strong>{filtered.length}</strong> designs
-              {query ? (
+              {view === "grid" && showCardRateEntry ? (
                 <>
-                  {" "}
-                  <span className="products-report__result-meta-muted">
-                    (filtered from {products.length})
-                  </span>
+                  Showing{" "}
+                  <strong>{Math.min(visibleCount, activeList.length)}</strong> of{" "}
+                  <strong>{activeList.length}</strong> pending designs
+                  {query ? (
+                    <>
+                      {" "}
+                      <span className="products-report__result-meta-muted">
+                        (filtered)
+                      </span>
+                    </>
+                  ) : null}
                 </>
-              ) : null}
+              ) : (
+                <>
+                  Showing{" "}
+                  <strong>{Math.min(visibleCount, activeList.length)}</strong> of{" "}
+                  <strong>{activeList.length}</strong> designs
+                  {query ? (
+                    <>
+                      {" "}
+                      <span className="products-report__result-meta-muted">
+                        (filtered from {products.length})
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
+
+          {view === "grid" && showCardRateEntry && rateDataStatus === "loading" ? (
+            <div className="products-report__grid-rate-banner" role="status">
+              <div className="products-report__rate-spinner" aria-hidden="true" />
+              Loading rate options for quick entry…
+            </div>
+          ) : null}
+
+          {view === "grid" && showCardRateEntry && rateDataStatus === "error" ? (
+            <div className="products-report__grid-rate-banner products-report__grid-rate-banner--error">
+              <span>Couldn&apos;t load rate data for card entry.</span>
+              <button
+                type="button"
+                className="products-report__rate-retry"
+                onClick={() => onLoadRateData?.()}
+              >
+                Retry
+              </button>
             </div>
           ) : null}
 
@@ -450,7 +948,7 @@ export default function ProductsReport({
             ) : (
               <RateDataLoading />
             )
-          ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 && !(view === "grid" && showCardRateEntry) ? (
             <div className="products-report__empty">
               {query ? (
                 <>
@@ -467,10 +965,37 @@ export default function ProductsReport({
               )}
             </div>
           ) : view === "grid" ? (
+            activeList.length === 0 ? (
+              <div className="products-report__empty">
+                {showCardRateEntry ? (
+                  <p>
+                    {user.role === "MANAGER"
+                      ? "No designs are ready for manager review. FIL and POL must both be completed first."
+                      : "All caught up — no pending designs in this list. Check the Completed tab or widen the date range."}
+                  </p>
+                ) : query ? (
+                  <>
+                    <p>No designs match your search.</p>
+                    <button type="button" onClick={() => setQuery("")}>
+                      Clear search
+                    </button>
+                  </>
+                ) : (
+                  <p>
+                    No designs were returned for {fromDate} – {toDate}. Try a
+                    different date range.
+                  </p>
+                )}
+              </div>
+            ) : (
             <>
               <div className="products-report__grid">
                 {visibleProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    rateEntry={buildCardRateEntry(p)}
+                  />
                 ))}
               </div>
               {hasMore ? (
@@ -481,6 +1006,7 @@ export default function ProductsReport({
                 />
               ) : null}
             </>
+            )
           ) : (
             <>
               <div className="products-report__table-wrap">

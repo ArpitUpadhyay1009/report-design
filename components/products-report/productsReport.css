@@ -312,6 +312,34 @@
   color: #b91c1c;
 }
 
+.products-report__grid-rate-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5b21b6;
+}
+
+.products-report__grid-rate-banner--error {
+  background: #fff1f2;
+  border-color: #fecaca;
+  color: #9f1239;
+  flex-wrap: wrap;
+}
+
+.products-report__grid-rate-banner .products-report__rate-spinner {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
 .products-report__rate-retry {
   border: none;
   background: #0f172a;

@@ -17,6 +17,7 @@ import {
 import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
 import type { RateEntry, RateEntries, RateRole } from "@/types/rateEntry";
+import { productForFilledRate } from "@/utils/rateEntryHelpers";
 import "./rateEntryView.css";
 
 type RateTable = Record<string, number>;
@@ -84,28 +85,6 @@ const custTone = (custType: Product["custType"]): "amber" | "violet" | "emerald"
   if (custType === "S") return "emerald";
   return "rose";
 };
-
-/** Build a display row for manager rate entry from get-Filled-Rates. */
-function productForFilledRate(filled: FilledRate, existing?: Product): Product {
-  if (existing) return existing;
-  return {
-    id: `filled__${filled.designId}`,
-    designCode: filled.designId,
-    managerName: "—",
-    managerShort: "—",
-    custType: "O",
-    numberOfParts: 0,
-    manufacturer: "—",
-    dep: "—",
-    polCtg: filled.dmCtg ?? "—",
-    difficulty: filled.difficulty,
-    filRate: filled.filRate,
-    polRate: filled.polRate,
-    prpRate: filled.prpRate,
-    dhagaRate: filled.dhagaRate,
-    custCode: "—",
-  };
-}
 
 export default function RateEntryView({
   mode = "pending",

@@ -1,10 +1,14 @@
+"use client";
+
 import ImageBox from "@/components/image-box/imageBox";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
+import type { Role } from "@/types/profile";
 import "./productCard.css";
 
 type Tone = "amber" | "rose" | "emerald" | "sky" | "violet";
 type CustMeta = { label: string; tone: Tone };
+type CardSubmitState = "idle" | "submitting" | "done" | "error";
 
 const custTypeMeta: Record<string, CustMeta> = {
   O: { label: "Original", tone: "amber" },
@@ -48,17 +52,62 @@ const inr = (n: number): string =>
     maximumFractionDigits: 2,
   }).format(n);
 
-interface ProductCardProps {
-  product: Product;
+export interface CardRateEntryProps {
+  role: Role;
+  difficultyOptions: string[];
+  polCategoryCodes: string[];
+  difficulty?: string;
+  dmCtg: string;
+  filRate?: number;
+  polRate?: number;
+  prpRate?: number;
+  dhagaRate?: number;
+  onDifficultyChange: (code: string) => void;
+  onDmCtgChange: (code: string) => void;
+  onSubmit: () => void;
+  canSubmit: boolean;
+  submitState: CardSubmitState;
+  submitMessage?: string;
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+interface ProductCardProps {
+  product: Product;
+  rateEntry?: CardRateEntryProps;
+}
+
+export default function ProductCard({ product, rateEntry }: ProductCardProps) {
   const cust = custMetaFor(product.custType);
   const diff = difficultyMetaFor(product.difficulty);
   const total = totalRate(product);
 
+  const showFilField =
+    rateEntry && (rateEntry.role === "FIL" || rateEntry.role === "MANAGER");
+  const showPolField =
+    rateEntry && (rateEntry.role === "POL" || rateEntry.role === "MANAGER");
+
+  const submitLabel =
+    rateEntry?.submitState === "submitting"
+      ? "Submitting…"
+      : rateEntry?.submitState === "done"
+      ? "Saved"
+      : rateEntry?.submitState === "error"
+      ? "Retry"
+      : rateEntry?.role === "FIL"
+      ? "Submit FIL rate"
+      : rateEntry?.role === "POL"
+      ? "Submit POL rate"
+      : "Submit approval";
+
   return (
-    <article className="product-card">
+    <article
+      className={`product-card${
+        rateEntry?.submitState === "done"
+          ? " product-card--saved"
+          : rateEntry?.submitState === "error"
+          ? " product-card--error"
+          : ""
+      }`}
+    >
       <header className="product-card__top">
         <div className="product-card__image">
           <ImageBox
@@ -124,6 +173,127 @@ export default function ProductCard({ product }: ProductCardProps) {
           </span>
         </div>
 
+        {rateEntry ? (
+          <div className="product-card__entry">
+            <div className="product-card__entry-head">
+              <span className="product-card__entry-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14">
+                  <path
+                    d="M12 3v18M5 8h11a3 3 0 010 6H7m13 4l-3-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span>Quick rate entry</span>
+            </div>
+
+            <div className="product-card__entry-fields">
+              {showFilField ? (
+                <label className="product-card__entry-field">
+                  <span>Difficulty</span>
+                  <select
+                    className="product-card__select"
+                    value={rateEntry.difficulty ?? ""}
+                    disabled={rateEntry.submitState === "submitting"}
+                    onChange={(e) =>
+                      rateEntry.onDifficultyChange(e.target.value)
+                    }
+                  >
+                    <option value="">Select difficulty…</option>
+                    {rateEntry.difficultyOptions.map((code) => (
+                      <option key={code} value={code}>
+                        {code}
+                      </option>
+                    ))}
+                  </select>
+                  {rateEntry.filRate !== undefined ? (
+                    <span className="product-card__entry-derived">
+                      FIL <strong>₹ {inr(rateEntry.filRate)}</strong>
+                    </span>
+                  ) : null}
+                </label>
+              ) : null}
+
+              {showPolField ? (
+                <label className="product-card__entry-field">
+                  <span>DmCtg</span>
+                  <select
+                    className="product-card__select"
+                    value={rateEntry.dmCtg}
+                    disabled={rateEntry.submitState === "submitting"}
+                    onChange={(e) => rateEntry.onDmCtgChange(e.target.value)}
+                  >
+                    <option value="">Select category…</option>
+                    {(
+                      rateEntry.dmCtg &&
+                      !rateEntry.polCategoryCodes.includes(rateEntry.dmCtg)
+                        ? [rateEntry.dmCtg, ...rateEntry.polCategoryCodes]
+                        : rateEntry.polCategoryCodes
+                    ).map((code) => (
+                      <option key={code} value={code}>
+                        {code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+
+            {showPolField &&
+            rateEntry.polRate !== undefined &&
+            rateEntry.prpRate !== undefined &&
+            rateEntry.dhagaRate !== undefined ? (
+              <div className="product-card__entry-rates">
+                <EntryRatePill label="POL" value={rateEntry.polRate} tone="sky" />
+                <EntryRatePill label="PRP" value={rateEntry.prpRate} tone="amber" />
+                <EntryRatePill
+                  label="DHAGA"
+                  value={rateEntry.dhagaRate}
+                  tone="emerald"
+                />
+              </div>
+            ) : null}
+
+            {rateEntry.submitMessage ? (
+              <p
+                className={`product-card__entry-feedback product-card__entry-feedback--${rateEntry.submitState}`}
+                role="status"
+              >
+                {rateEntry.submitMessage}
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              className="product-card__submit"
+              disabled={
+                !rateEntry.canSubmit ||
+                rateEntry.submitState === "submitting" ||
+                rateEntry.submitState === "done"
+              }
+              onClick={rateEntry.onSubmit}
+            >
+              {rateEntry.submitState === "done" ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path
+                    d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : null}
+              {submitLabel}
+            </button>
+          </div>
+        ) : null}
+
         <div className="product-card__rates">
           <div className="product-card__rates-header">
             <span>System rate breakdown</span>
@@ -146,19 +316,23 @@ export default function ProductCard({ product }: ProductCardProps) {
           <em>Customer code</em>
           <strong>{product.custCode}</strong>
         </span>
-        <button type="button" className="product-card__cta">
-          Details
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <path
-              d="M9 6l6 6-6 6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+        {!rateEntry ? (
+          <button type="button" className="product-card__cta">
+            Details
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path
+                d="M9 6l6 6-6 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : (
+          <span className="product-card__entry-hint">Card entry</span>
+        )}
       </footer>
     </article>
   );
@@ -176,5 +350,20 @@ function RateCell({ label, value, accent }: RateCellProps) {
       <span className="rate-cell__label">{label}</span>
       <span className="rate-cell__value">{inr(value)}</span>
     </div>
+  );
+}
+
+interface EntryRatePillProps {
+  label: string;
+  value: number;
+  tone: "sky" | "amber" | "emerald";
+}
+
+function EntryRatePill({ label, value, tone }: EntryRatePillProps) {
+  return (
+    <span className={`product-card__entry-pill product-card__entry-pill--${tone}`}>
+      <em>{label}</em>
+      <strong>₹ {inr(value)}</strong>
+    </span>
   );
 }
