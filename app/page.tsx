@@ -141,12 +141,13 @@ export default function Home() {
         setDifficultyRates(diffs);
       }
       if (user.role === "FIL") {
-        const [completedFil, designWise] = await Promise.all([
-          fetchCompletedFilDesignIds(),
-          fetchDesignWiseDifficulty(),
-        ]);
+        const completedFil = await fetchCompletedFilDesignIds();
         if (sessionRef.current !== session) return;
         setCompletedFilDesignIds(completedFil);
+      }
+      if (user.role === "FIL" || user.role === "MANAGER") {
+        const designWise = await fetchDesignWiseDifficulty();
+        if (sessionRef.current !== session) return;
         setDesignWiseDifficulties(designWise);
       }
       if (user.role === "POL" || user.role === "MANAGER") {

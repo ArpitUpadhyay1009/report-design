@@ -27,6 +27,7 @@ import type {
 } from "@/types/rateEntry";
 import {
   buildDesignDifficultiesByDmCtg,
+  buildDifficultyToDmCtgMap,
   categoryRatesFor,
   designDifficultiesForDmCtg,
   filRateForDesignDifficulty,
@@ -38,6 +39,7 @@ import {
   polDropdownOptionsForDmCtg,
   productForFilledRate,
   resolveDefaultDesignDifficulty,
+  resolveProductDmCtg,
 } from "@/utils/rateEntryHelpers";
 import "./productsReport.css";
 
@@ -232,6 +234,11 @@ export default function ProductsReport({
     [designWiseDifficulties]
   );
 
+  const difficultyToDmCtg = useMemo(
+    () => buildDifficultyToDmCtgMap(designWiseDifficulties ?? []),
+    [designWiseDifficulties]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -255,7 +262,11 @@ export default function ProductsReport({
       );
       return filledRates
         .map((filled) =>
-          productForFilledRate(filled, productByDesign.get(filled.designId))
+          productForFilledRate(
+            filled,
+            productByDesign.get(filled.designId),
+            difficultyToDmCtg
+          )
         )
         .filter((p) => !localCompletedManager.has(p.designCode))
         .filter((p) => {
@@ -290,6 +301,7 @@ export default function ProductsReport({
     completedFilSet,
     completedPolSet,
     query,
+    difficultyToDmCtg,
   ]);
 
   const activeList =
@@ -318,9 +330,14 @@ export default function ProductsReport({
 
       if (user.role === "FIL") {
         const e = rateEntries[p.id]?.FIL;
+        const resolvedDmCtg = resolveProductDmCtg(
+          p,
+          designDifficultiesByDmCtg,
+          difficultyToDmCtg
+        );
         const options = designDifficultiesForDmCtg(
           designDifficultiesByDmCtg,
-          p.polCtg
+          resolvedDmCtg
         );
         const difficulty =
           e?.difficulty ?? resolveDefaultDesignDifficulty(options, p.difficulty);
@@ -366,17 +383,31 @@ export default function ProductsReport({
       if (user.role === "MANAGER") {
         const filled = filledByDesign.get(p.designCode);
         const sectionEntry = rateEntries[p.id]?.MANAGER ?? {};
-        const difficulty = sectionEntry.difficulty ?? filled?.difficulty;
+        const resolvedDmCtg = resolveProductDmCtg(
+          p,
+          designDifficultiesByDmCtg,
+          difficultyToDmCtg,
+          filled
+        );
+        const options = designDifficultiesForDmCtg(
+          designDifficultiesByDmCtg,
+          resolvedDmCtg
+        );
+        const difficulty =
+          sectionEntry.difficulty ??
+          resolveDefaultDesignDifficulty(
+            options,
+            filled?.difficulty ?? p.difficulty
+          );
         const filRate =
           sectionEntry.filRate ??
-          filled?.filRate ??
           (difficulty
-            ? filRateForDifficulty(
+            ? filRateForDesignDifficulty(
                 difficultyRates ?? [],
                 difficulty,
                 p.custType
               )
-            : undefined);
+            : filled?.filRate);
         if (
           typeof difficulty !== "string" ||
           difficulty.length === 0 ||
@@ -386,7 +417,7 @@ export default function ProductsReport({
           return false;
         }
         const effectiveDmCtg =
-          sectionEntry.dmCtg ?? p.polCtg ?? filled?.dmCtg ?? "";
+          sectionEntry.dmCtg ?? resolvedDmCtg ?? filled?.dmCtg ?? "";
         if (!effectiveDmCtg) return false;
         const polEntry = polRatesByCategory.get(effectiveDmCtg);
         if (!polEntry) return false;
@@ -405,7 +436,7 @@ export default function ProductsReport({
 
       return false;
     },
-    [editableRole, user.role, rateEntries, polRatesByCategory, filledByDesign, difficultyRates, designDifficultiesByDmCtg]
+    [editableRole, user.role, rateEntries, polRatesByCategory, filledByDesign, difficultyRates, designDifficultiesByDmCtg, difficultyToDmCtg]
   );
 
   const handleCardDifficultyChange = useCallback(
@@ -496,9 +527,14 @@ export default function ProductsReport({
 
       try {
         if (user.role === "FIL") {
+          const resolvedDmCtg = resolveProductDmCtg(
+            product,
+            designDifficultiesByDmCtg,
+            difficultyToDmCtg
+          );
           const options = designDifficultiesForDmCtg(
             designDifficultiesByDmCtg,
-            product.polCtg
+            resolvedDmCtg
           );
           const sectionEntry = rateEntries[product.id]?.FIL ?? {};
           const difficulty =
@@ -567,35 +603,47 @@ export default function ProductsReport({
         } else if (user.role === "MANAGER") {
           const filled = filledByDesign.get(product.designCode);
           const sectionEntry = rateEntries[product.id]?.MANAGER ?? {};
-          const difficulty = sectionEntry.difficulty ?? filled?.difficulty;
+          const resolvedDmCtg = resolveProductDmCtg(
+            product,
+            designDifficultiesByDmCtg,
+            difficultyToDmCtg,
+            filled
+          );
+          const options = designDifficultiesForDmCtg(
+            designDifficultiesByDmCtg,
+            resolvedDmCtg
+          );
+          const difficulty =
+            sectionEntry.difficulty ??
+            resolveDefaultDesignDifficulty(
+              options,
+              filled?.difficulty ?? product.difficulty
+            );
           const filRate =
             sectionEntry.filRate ??
-            filled?.filRate ??
             (difficulty
-              ? filRateForDifficulty(
+              ? filRateForDesignDifficulty(
                   difficultyRates ?? [],
                   difficulty,
                   product.custType
                 )
-              : undefined);
+              : filled?.filRate);
           const effectiveDmCtg =
-            sectionEntry.dmCtg ?? product.polCtg ?? filled?.dmCtg ?? "";
-          const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
-          const isO = product.custType === "O";
+            sectionEntry.dmCtg ?? resolvedDmCtg ?? filled?.dmCtg ?? "";
+          const lookup = categoryRatesFor(
+            polRates ?? [],
+            effectiveDmCtg,
+            product.custType
+          );
           const result = await submitManagerRate({
             user_id: user.userId,
             design_id: product.designCode,
             difficulty: difficulty as string,
             manager_fil_rate: filRate as number,
-            manager_pol_rate: (isO
-              ? polEntry.normalPol
-              : polEntry.brandPol) as number,
-            manager_prp_rate: (isO
-              ? polEntry.normalPrp
-              : polEntry.brandPrp) as number,
-            manager_dhaga_rate: (isO
-              ? polEntry.normalDhaga
-              : polEntry.brandDhaga) as number,
+            manager_pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
+            manager_prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
+            manager_dhaga_rate: (sectionEntry.dhagaRate ??
+              lookup.dhagaRate) as number,
           });
           if (result.status === "1") {
             setLocalCompletedManager((prev) =>
@@ -627,10 +675,11 @@ export default function ProductsReport({
       isCardProductValid,
       cardSubmitStates,
       rateEntries,
-      polRatesByCategory,
+      polRates,
       filledByDesign,
       difficultyRates,
       designDifficultiesByDmCtg,
+      difficultyToDmCtg,
     ]
   );
 
@@ -641,19 +690,25 @@ export default function ProductsReport({
       }
 
       const filled = filledByDesign.get(product.designCode);
+      const resolvedDmCtg = resolveProductDmCtg(
+        product,
+        designDifficultiesByDmCtg,
+        difficultyToDmCtg,
+        filled
+      );
       const sectionEntry = rateEntries[product.id]?.[editableRole] ?? {};
       const filDifficultyOptions =
-        user.role === "FIL"
+        user.role === "FIL" || user.role === "MANAGER"
           ? designDifficultiesForDmCtg(
               designDifficultiesByDmCtg,
-              product.polCtg
+              resolvedDmCtg
             )
           : apiDifficultyCodes;
       const defaultFilDifficulty =
-        user.role === "FIL"
+        user.role === "FIL" || user.role === "MANAGER"
           ? resolveDefaultDesignDifficulty(
               filDifficultyOptions,
-              product.difficulty
+              filled?.difficulty ?? product.difficulty
             )
           : undefined;
       const difficulty =
@@ -661,13 +716,13 @@ export default function ProductsReport({
         defaultFilDifficulty ??
         (user.role === "MANAGER" ? filled?.difficulty : undefined);
       const dmCtg =
-        sectionEntry.dmCtg ?? product.polCtg ?? filled?.dmCtg ?? "";
+        sectionEntry.dmCtg ?? resolvedDmCtg ?? filled?.dmCtg ?? "";
       const polDropdownOptions = polDropdownOptionsForDmCtg(
         polRates ?? [],
-        product.polCtg
+        resolvedDmCtg
       );
       const polDropdownValue =
-        sectionEntry.polSp ?? sectionEntry.dmCtg ?? product.polCtg;
+        sectionEntry.polSp ?? sectionEntry.dmCtg ?? resolvedDmCtg;
       const lookupRates = categoryRatesFor(
         polRates ?? [],
         dmCtg,
@@ -676,7 +731,7 @@ export default function ProductsReport({
       const filRate =
         sectionEntry.filRate ??
         (difficulty
-          ? user.role === "FIL"
+          ? user.role === "FIL" || user.role === "MANAGER"
             ? filRateForDesignDifficulty(
                 difficultyRates ?? [],
                 difficulty,
@@ -694,7 +749,7 @@ export default function ProductsReport({
         difficultyOptions: filDifficultyOptions,
         polDropdownOptions,
         polCategoryCodes,
-        usePolDualDropdown: user.role === "POL",
+        usePolDualDropdown: user.role === "POL" || user.role === "MANAGER",
         polRatesEditable: user.role === "POL",
         difficulty,
         polDropdownValue,
@@ -732,6 +787,7 @@ export default function ProductsReport({
       apiDifficultyCodes,
       polCategoryCodes,
       designDifficultiesByDmCtg,
+      difficultyToDmCtg,
       handleCardDifficultyChange,
       handleCardPolOptionChange,
       handleCardDmCtgChange,

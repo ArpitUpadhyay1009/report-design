@@ -33,7 +33,10 @@ export function categoryRatesFor(
   polCtg: string,
   custType: string
 ): CategoryRates {
-  const entry = polRates.find((r) => r.category === polCtg);
+  const normalized = normalizeDmCtg(polCtg);
+  const entry = polRates.find(
+    (r) => r.category.trim().toUpperCase() === normalized
+  );
   if (!entry) return {};
   if (custType === "O") {
     return {
@@ -59,10 +62,11 @@ export function buildDesignDifficultiesByDmCtg(
 ): Map<string, string[]> {
   const map = new Map<string, string[]>();
   for (const item of items) {
-    const list = map.get(item.dmCtg) ?? [];
+    const key = item.dmCtg.trim().toUpperCase();
+    const list = map.get(key) ?? [];
     if (!list.includes(item.designDifficulty)) {
       list.push(item.designDifficulty);
-      map.set(item.dmCtg, list);
+      map.set(key, list);
     }
   }
   for (const [, list] of map) {
@@ -71,12 +75,70 @@ export function buildDesignDifficultiesByDmCtg(
   return map;
 }
 
+export function buildDifficultyToDmCtgMap(
+  items: DesignWiseDifficulty[]
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const item of items) {
+    map.set(item.designDifficulty, item.dmCtg.trim().toUpperCase());
+  }
+  return map;
+}
+
+const normalizeDmCtg = (value?: string | null): string => {
+  const normalized = (value ?? "").trim().toUpperCase();
+  if (!normalized || normalized === "—") return "";
+  return normalized;
+};
+
+/** Resolve the DmCtg key used for design-wise difficulty and POL dropdowns. */
+export function resolveProductDmCtg(
+  product: Product,
+  byDmCtg: Map<string, string[]>,
+  difficultyToDmCtg: Map<string, string>,
+  filled?: FilledRate
+): string {
+  const candidates: string[] = [];
+
+  const push = (value?: string | null) => {
+    const normalized = normalizeDmCtg(value);
+    if (normalized) candidates.push(normalized);
+  };
+
+  push(product.polCtg);
+  push(product.tpRmCtg);
+  push(filled?.dmCtg);
+
+  for (const difficulty of [
+    filled?.difficulty,
+    product.difficulty,
+  ]) {
+    const code = (difficulty ?? "").trim();
+    if (!code || code === "—") continue;
+    const fromMap = difficultyToDmCtg.get(code);
+    if (fromMap) candidates.push(fromMap);
+  }
+
+  for (const candidate of candidates) {
+    if (byDmCtg.has(candidate)) return candidate;
+  }
+
+  for (const difficulty of [filled?.difficulty, product.difficulty]) {
+    const code = (difficulty ?? "").trim();
+    if (!code || code === "—") continue;
+    const fromMap = difficultyToDmCtg.get(code);
+    if (fromMap) return fromMap;
+  }
+
+  return candidates[0] ?? "";
+}
+
 export function designDifficultiesForDmCtg(
   byDmCtg: Map<string, string[]>,
   dmCtg: string
 ): string[] {
-  const normalized = dmCtg.trim();
-  if (!normalized || normalized === "—") return [];
+  const normalized = normalizeDmCtg(dmCtg);
+  if (!normalized) return [];
   return byDmCtg.get(normalized) ?? [];
 }
 
@@ -116,7 +178,10 @@ export function polSpForDmCtg(
   polRates: PolRate[],
   dmCtg: string
 ): string | undefined {
-  const entry = polRates.find((r) => r.category === dmCtg);
+  const normalized = normalizeDmCtg(dmCtg);
+  const entry = polRates.find(
+    (r) => r.category.trim().toUpperCase() === normalized
+  );
   return entry?.polSp || undefined;
 }
 
@@ -124,8 +189,8 @@ export function polDropdownOptionsForDmCtg(
   polRates: PolRate[],
   dmCtg: string
 ): string[] {
-  const normalized = dmCtg.trim();
-  if (!normalized || normalized === "—") return [];
+  const normalized = normalizeDmCtg(dmCtg);
+  if (!normalized) return [];
   const polSp = polSpForDmCtg(polRates, normalized);
   if (polSp && polSp !== normalized) return [normalized, polSp];
   return [normalized];
@@ -194,9 +259,26 @@ export function polCategoryCodesFrom(polRates: PolRate[]): string[] {
 /** Build a display row for manager rate entry from get-Filled-Rates. */
 export function productForFilledRate(
   filled: FilledRate,
-  existing?: Product
+  existing?: Product,
+  difficultyToDmCtg?: Map<string, string>
 ): Product {
-  if (existing) return existing;
+  const dmCtgFromDifficulty = (difficulty?: string): string => {
+    const code = (difficulty ?? "").trim();
+    if (!code || code === "—") return "";
+    return difficultyToDmCtg?.get(code) ?? "";
+  };
+
+  if (existing) {
+    const resolvedDmCtg =
+      normalizeDmCtg(existing.polCtg) ||
+      normalizeDmCtg(existing.tpRmCtg) ||
+      normalizeDmCtg(filled.dmCtg) ||
+      dmCtgFromDifficulty(filled.difficulty) ||
+      dmCtgFromDifficulty(existing.difficulty);
+    return resolvedDmCtg ? { ...existing, polCtg: resolvedDmCtg } : existing;
+  }
+  const stubDmCtg =
+    normalizeDmCtg(filled.dmCtg) || dmCtgFromDifficulty(filled.difficulty);
   return {
     id: `filled__${filled.designId}`,
     designCode: filled.designId,
@@ -206,7 +288,7 @@ export function productForFilledRate(
     numberOfParts: 0,
     manufacturer: "—",
     dep: "—",
-    polCtg: filled.dmCtg ?? "—",
+    polCtg: stubDmCtg || "—",
     difficulty: filled.difficulty,
     filRate: filled.filRate,
     polRate: filled.polRate,
