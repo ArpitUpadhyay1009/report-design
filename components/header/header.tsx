@@ -38,7 +38,7 @@ export default function Header({ user, onLogout }: HeaderProps) {
             </svg>
           </span>
           <div className="app-header__titles">
-            <h1 className="app-header__title">Production Rate Report</h1>
+            <h1 className="app-header__title">Design Approval System</h1>
             <p className="app-header__subtitle">
               Standard norms &amp; system rates per design
             </p>
