@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { difficulties } from "@/constants/rate";
 import ImageBox from "@/components/image-box/imageBox";
 import {
@@ -35,7 +35,10 @@ interface CategoryRates {
   dhagaRate?: number;
 }
 
+export type RateEntryMode = "pending" | "completed";
+
 interface RateEntryViewProps {
+  mode?: RateEntryMode;
   products: Product[];
   user: Profile;
   entries: RateEntries;
@@ -73,6 +76,8 @@ const colsPerSection: Record<RateRole, number> = {
   MANAGER: 6,
 };
 
+const PAGE_SIZE = 10;
+
 const custTone = (custType: Product["custType"]): "amber" | "violet" | "emerald" | "rose" => {
   if (custType === "O") return "amber";
   if (custType === "B") return "violet";
@@ -103,6 +108,7 @@ function productForFilledRate(filled: FilledRate, existing?: Product): Product {
 }
 
 export default function RateEntryView({
+  mode = "pending",
   products,
   user,
   entries,
@@ -115,6 +121,7 @@ export default function RateEntryView({
   completedPolDesignIds,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
+  const showCheckboxes = mode === "pending";
 
   const completedFilSet = useMemo(
     () => new Set(completedFilDesignIds ?? []),
@@ -140,10 +147,7 @@ export default function RateEntryView({
     return map;
   }, [filledRates]);
 
-  // Manager rows come from get-Filled-Rates, not the date-filtered design
-  // list. When a filled design also exists in `products`, we merge in the
-  // richer card/table fields (image, manager, cust type, etc.).
-  const displayProducts = useMemo(() => {
+  const allDisplayProducts = useMemo(() => {
     if (user.role !== "MANAGER") return products;
     if (!filledRates?.length) return [];
     const productByDesign = new Map(
@@ -153,6 +157,36 @@ export default function RateEntryView({
       productForFilledRate(filled, productByDesign.get(filled.designId))
     );
   }, [user.role, products, filledRates]);
+
+  // FIL / POL: pending tab excludes completed IDs; completed tab shows only
+  // those IDs (intersected with the current design list). Manager unchanged.
+  const displayProducts = useMemo(() => {
+    if (user.role === "MANAGER") return allDisplayProducts;
+    if (mode === "completed") {
+      return allDisplayProducts.filter((p) => isStageCompleted(p.designCode));
+    }
+    return allDisplayProducts.filter((p) => !isStageCompleted(p.designCode));
+  }, [user.role, allDisplayProducts, mode, isStageCompleted]);
+
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [displayProducts, mode]);
+
+  const visibleProducts = useMemo(
+    () => displayProducts.slice(0, visibleCount),
+    [displayProducts, visibleCount]
+  );
+
+  const hasMore = visibleCount < displayProducts.length;
+  const remainingCount = displayProducts.length - visibleCount;
+
+  const handleShowMore = useCallback(() => {
+    setVisibleCount((n) => Math.min(n + PAGE_SIZE, displayProducts.length));
+  }, [displayProducts.length]);
+
+  const designColSpan = showCheckboxes ? 4 : 3;
   const editableSection: RateRole | null =
     user.role === "POL"
       ? "POL"
@@ -235,7 +269,7 @@ export default function RateEntryView({
 
   const isProductValid = useCallback(
     (p: Product): boolean => {
-      if (isStageCompleted(p.designCode)) return false;
+      if (mode === "completed") return false;
       if (user.role === "FIL") {
         const e = entries[p.id]?.FIL;
         return (
@@ -292,7 +326,7 @@ export default function RateEntryView({
       }
       return false;
     },
-    [user.role, entries, polRatesByCategory, isStageCompleted]
+    [mode, user.role, entries, polRatesByCategory]
   );
 
   const submittableProducts = useMemo(
@@ -469,10 +503,17 @@ export default function RateEntryView({
       <div className="rate-entry__intro">
         <div>
           <h2 className="rate-entry__title">
-            Rate entry &middot; <span>{user.role}</span>
+            {mode === "completed" ? "Completed" : "Rate entry"} &middot;{" "}
+            <span>{user.role}</span>
           </h2>
           <p className="rate-entry__subtitle">
-            {user.role === "MANAGER"
+            {mode === "completed"
+              ? user.role === "FIL"
+                ? "Designs where FIL rates have already been submitted."
+                : user.role === "POL"
+                ? "Designs where POL rates have already been submitted."
+                : "Previously submitted entries."
+              : user.role === "MANAGER"
               ? "Review what FIL and POL filled, enter your final approved rates, then check the rows to submit."
               : "Pick from the dropdowns below — rates fill in automatically. Check the rows you want to submit."}
           </p>
@@ -484,11 +525,22 @@ export default function RateEntryView({
         </div>
       </div>
 
+      {displayProducts.length > 0 ? (
+        <div className="rate-entry__result-meta">
+          Showing{" "}
+          <strong>{Math.min(visibleCount, displayProducts.length)}</strong> of{" "}
+          <strong>{displayProducts.length}</strong> designs
+        </div>
+      ) : null}
+
       <div className="rate-entry__table-wrap">
         <table className="rate-entry__table">
           <thead>
             <tr className="rate-entry__group-row">
-              <th colSpan={4} className="rate-entry__group rate-entry__group--design">
+              <th
+                colSpan={designColSpan}
+                className="rate-entry__group rate-entry__group--design"
+              >
                 Design
               </th>
               {sections.map((s) => (
@@ -507,17 +559,19 @@ export default function RateEntryView({
               ))}
             </tr>
             <tr className="rate-entry__col-row">
-              <th className="rate-entry__th rate-entry__th--check">
-                <input
-                  type="checkbox"
-                  className="rate-entry__checkbox"
-                  checked={allSelected}
-                  onChange={toggleSelectAll}
-                  disabled={submitting || displayProducts.length === 0}
-                  aria-label="Select all rows"
-                  title="Select all rows"
-                />
-              </th>
+              {showCheckboxes ? (
+                <th className="rate-entry__th rate-entry__th--check">
+                  <input
+                    type="checkbox"
+                    className="rate-entry__checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    disabled={submitting || displayProducts.length === 0}
+                    aria-label="Select all rows"
+                    title="Select all rows"
+                  />
+                </th>
+              ) : null}
               <th className="rate-entry__th rate-entry__th--image">Image</th>
               <th className="rate-entry__th">Design</th>
               <th className="rate-entry__th">Manager</th>
@@ -531,44 +585,50 @@ export default function RateEntryView({
               <tr>
                 <td
                   colSpan={
-                    4 + sections.reduce((n, s) => n + colsPerSection[s], 0)
+                    designColSpan +
+                    sections.reduce((n, s) => n + colsPerSection[s], 0)
                   }
                   className="rate-entry__empty-row"
                 >
-                  {user.role === "MANAGER"
+                  {mode === "completed"
+                    ? "No completed designs in the current list. Widen the date range or check back after submissions."
+                    : user.role === "MANAGER"
                     ? filledRates?.length
                       ? "Filled rates were loaded but none could be displayed. Try refreshing."
                       : "No designs are ready for manager review yet. FIL and POL must both be completed."
+                    : user.role === "FIL" || user.role === "POL"
+                    ? "No pending designs — matching rows are in the Completed tab."
                     : "No designs to show."}
                 </td>
               </tr>
             ) : null}
-            {displayProducts.map((p) => {
+            {visibleProducts.map((p) => {
               const productEntries = entries[p.id] ?? {};
               const rowStatus = rowStatuses[p.id];
               const rowMessage = rowMessages[p.id];
               const isSelected = selectedIds.has(p.id);
-              const stageCompleted = isStageCompleted(p.designCode);
               const rowClass = [
                 "rate-entry__row",
                 rowStatus ? `rate-entry__row--${rowStatus}` : "",
                 isSelected ? "rate-entry__row--selected" : "",
-                stageCompleted ? "rate-entry__row--stage-completed" : "",
+                mode === "completed" ? "rate-entry__row--stage-completed" : "",
               ]
                 .filter(Boolean)
                 .join(" ");
               return (
                 <tr key={p.id} className={rowClass}>
-                  <td className="rate-entry__td rate-entry__td--check">
-                    <input
-                      type="checkbox"
-                      className="rate-entry__checkbox"
-                      checked={isSelected}
-                      onChange={(e) => toggleRow(p.id, e.target.checked)}
-                      disabled={submitting || stageCompleted}
-                      aria-label={`Select ${p.designCode} for submission`}
-                    />
-                  </td>
+                  {showCheckboxes ? (
+                    <td className="rate-entry__td rate-entry__td--check">
+                      <input
+                        type="checkbox"
+                        className="rate-entry__checkbox"
+                        checked={isSelected}
+                        onChange={(e) => toggleRow(p.id, e.target.checked)}
+                        disabled={submitting}
+                        aria-label={`Select ${p.designCode} for submission`}
+                      />
+                    </td>
+                  ) : null}
                   <td className="rate-entry__td rate-entry__td--image">
                     <div className="rate-entry__thumb">
                       <ImageBox
@@ -622,6 +682,16 @@ export default function RateEntryView({
                           dhagaRate: filled.dhagaRate,
                         };
                       }
+                    } else if (
+                      mode === "completed" &&
+                      isEditable &&
+                      user.role === "FIL" &&
+                      s === "FIL"
+                    ) {
+                      sectionEntry = {
+                        ...sectionEntry,
+                        filRate: sectionEntry.filRate ?? p.filRate,
+                      };
                     }
 
                     const effectiveDmCtg =
@@ -630,12 +700,17 @@ export default function RateEntryView({
                         : sectionEntry.dmCtg ??
                           (isEditable ? p.polCtg : filled?.dmCtg ?? "");
 
-                    // For the POL section's three rate cells:
-                    //   - editable (POL user / MANAGER): derive from DmCtg+custType.
-                    //   - read-only (manager view): show whatever the POL user
-                    //     actually submitted on this design (else "—").
                     const polSectionRates: CategoryRates =
-                      s === "POL" && !isEditable
+                      mode === "completed" &&
+                      isEditable &&
+                      user.role === "POL" &&
+                      s === "POL"
+                        ? {
+                            polRate: p.polRate,
+                            prpRate: p.prpRate,
+                            dhagaRate: p.dhagaRate,
+                          }
+                        : s === "POL" && !isEditable
                         ? {
                             polRate: sectionEntry.polRate,
                             prpRate: sectionEntry.prpRate,
@@ -647,8 +722,10 @@ export default function RateEntryView({
                       <SectionCells
                         key={s}
                         section={s}
-                        editable={isEditable}
-                        stageCompleted={isEditable && stageCompleted}
+                        editable={isEditable && mode === "pending"}
+                        stageCompleted={
+                          mode === "completed" && isEditable
+                        }
                         entry={sectionEntry}
                         onPatch={(patch) => onChange(p.id, s, patch)}
                         difficultyCodes={
@@ -668,9 +745,25 @@ export default function RateEntryView({
         </table>
       </div>
 
-      {user.role === "FIL" ||
-      user.role === "POL" ||
-      user.role === "MANAGER" ? (
+      {hasMore ? (
+        <div className="rate-entry__show-more">
+          <button
+            type="button"
+            className="rate-entry__show-more-btn"
+            onClick={handleShowMore}
+          >
+            Show {Math.min(PAGE_SIZE, remainingCount)} more
+          </button>
+          <span className="rate-entry__show-more-meta">
+            {remainingCount} remaining
+          </span>
+        </div>
+      ) : null}
+
+      {showCheckboxes &&
+      (user.role === "FIL" ||
+        user.role === "POL" ||
+        user.role === "MANAGER") ? (
         <div className="rate-entry__submit-bar">
           <div className="rate-entry__submit-info">
             {submittableProducts.length === 0 ? (

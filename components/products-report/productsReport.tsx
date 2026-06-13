@@ -20,7 +20,7 @@ import type {
 } from "@/types/rateEntry";
 import "./productsReport.css";
 
-type ViewMode = "grid" | "table" | "entry";
+type ViewMode = "grid" | "table" | "entry" | "completed";
 
 export type RateDataStatus = "idle" | "loading" | "ready" | "error";
 
@@ -89,6 +89,14 @@ export default function ProductsReport({
     setView("entry");
     onLoadRateData?.();
   }, [onLoadRateData]);
+
+  const handleOpenCompleted = useCallback(() => {
+    setView("completed");
+    onLoadRateData?.();
+  }, [onLoadRateData]);
+
+  const showCompletedTab =
+    user.role === "FIL" || user.role === "POL";
 
   const handleRateChange = useCallback(
     (productId: string, role: RateRole, patch: Partial<RateEntry>) => {
@@ -352,6 +360,29 @@ export default function ProductsReport({
             </svg>
             Rate entry
           </button>
+          {showCompletedTab ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "completed"}
+              className={`products-report__view${
+                view === "completed" ? " products-report__view--active" : ""
+              }`}
+              onClick={handleOpenCompleted}
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path
+                  d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Completed
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -363,7 +394,7 @@ export default function ProductsReport({
         <DesignsError message={load.message} onRetry={onRetryLoad} />
       ) : (
         <>
-          {view !== "entry" ? (
+          {view !== "entry" && view !== "completed" ? (
             <div className="products-report__result-meta">
               Showing{" "}
               <strong>{Math.min(visibleCount, filtered.length)}</strong> of{" "}
@@ -382,6 +413,27 @@ export default function ProductsReport({
           {view === "entry" ? (
             rateDataStatus === "ready" ? (
               <RateEntryView
+                mode="pending"
+                products={filtered}
+                user={user}
+                entries={rateEntries}
+                onChange={handleRateChange}
+                difficultyOptions={difficultyHeaders}
+                difficultyRates={difficultyRates}
+                polRates={polRates}
+                filledRates={filledRates}
+                completedFilDesignIds={completedFilDesignIds}
+                completedPolDesignIds={completedPolDesignIds}
+              />
+            ) : rateDataStatus === "error" ? (
+              <RateDataError onRetry={() => onLoadRateData?.()} />
+            ) : (
+              <RateDataLoading />
+            )
+          ) : view === "completed" ? (
+            rateDataStatus === "ready" ? (
+              <RateEntryView
+                mode="completed"
                 products={filtered}
                 user={user}
                 entries={rateEntries}
