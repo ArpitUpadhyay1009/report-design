@@ -9,10 +9,12 @@ import {
   fetchCompletedFilDesignIds,
   fetchCompletedPolDesignIds,
   fetchDesignApprovals,
+  fetchDesignWiseDifficulty,
   fetchDifficultyHeaders,
   fetchFilledRates,
   fetchPolRates,
   type DifficultyRate,
+  type DesignWiseDifficulty,
   type FilledRate,
   type PolRate,
 } from "@/services/api";
@@ -41,6 +43,9 @@ export default function Home() {
   const [completedPolDesignIds, setCompletedPolDesignIds] = useState<string[]>(
     []
   );
+  const [designWiseDifficulties, setDesignWiseDifficulties] = useState<
+    DesignWiseDifficulty[]
+  >([]);
   const [rateDataStatus, setRateDataStatus] = useState<RateDataStatus>("idle");
   const [refetchKey, setRefetchKey] = useState(0);
 
@@ -65,6 +70,7 @@ export default function Home() {
     setFilledRates([]);
     setCompletedFilDesignIds([]);
     setCompletedPolDesignIds([]);
+    setDesignWiseDifficulties([]);
   }, [user]);
 
   // Fetch designs whenever user, dates, or a manual retry changes.
@@ -135,9 +141,13 @@ export default function Home() {
         setDifficultyRates(diffs);
       }
       if (user.role === "FIL") {
-        const completedFil = await fetchCompletedFilDesignIds();
+        const [completedFil, designWise] = await Promise.all([
+          fetchCompletedFilDesignIds(),
+          fetchDesignWiseDifficulty(),
+        ]);
         if (sessionRef.current !== session) return;
         setCompletedFilDesignIds(completedFil);
+        setDesignWiseDifficulties(designWise);
       }
       if (user.role === "POL" || user.role === "MANAGER") {
         const pols = await fetchPolRates();
@@ -208,6 +218,7 @@ export default function Home() {
           filledRates={filledRates}
           completedFilDesignIds={completedFilDesignIds}
           completedPolDesignIds={completedPolDesignIds}
+          designWiseDifficulties={designWiseDifficulties}
           rateDataStatus={rateDataStatus}
           onLoadRateData={loadRateData}
         />

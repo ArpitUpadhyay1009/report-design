@@ -173,6 +173,40 @@ export async function fetchDifficultyHeaders(): Promise<DifficultyRate[]> {
     .filter((r): r is DifficultyRate => r !== null);
 }
 
+/** Raw response from get-Design-wise-Difficulty (FIL rate entry). */
+export interface DesignWiseDifficultyRow {
+  DmCtg: string | null;
+  DesignDifficulty: string | null;
+}
+
+export interface DesignWiseDifficultyResponse {
+  status: string;
+  data?: DesignWiseDifficultyRow[];
+  total?: number;
+  message?: string;
+}
+
+export interface DesignWiseDifficulty {
+  dmCtg: string;
+  designDifficulty: string;
+}
+
+/** FIL: per-DmCtg design difficulty options for rate entry dropdowns. */
+export async function fetchDesignWiseDifficulty(): Promise<DesignWiseDifficulty[]> {
+  const response = await apiClient.post<DesignWiseDifficultyResponse>(
+    "/get-Design-wise-Difficulty"
+  );
+  const list = response.data?.data ?? [];
+  return list
+    .map<DesignWiseDifficulty | null>((row) => {
+      const dmCtg = (row?.DmCtg ?? "").trim();
+      const designDifficulty = (row?.DesignDifficulty ?? "").trim();
+      if (!dmCtg || !designDifficulty) return null;
+      return { dmCtg, designDifficulty };
+    })
+    .filter((r): r is DesignWiseDifficulty => r !== null);
+}
+
 export interface PolRate {
   category: string;
   polSp: string;

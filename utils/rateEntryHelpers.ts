@@ -1,5 +1,10 @@
 import { difficulties } from "@/constants/rate";
-import type { DifficultyRate, FilledRate, PolRate } from "@/services/api";
+import type {
+  DesignWiseDifficulty,
+  DifficultyRate,
+  FilledRate,
+  PolRate,
+} from "@/services/api";
 import type { Product } from "@/types/product";
 
 export interface CategoryRates {
@@ -45,6 +50,66 @@ export function categoryRatesFor(
     };
   }
   return {};
+}
+
+const DESIGN_DIFFICULTY_RATE_SUFFIX = /(D\d+|E\d+|M\d+|SP)$/;
+
+export function buildDesignDifficultiesByDmCtg(
+  items: DesignWiseDifficulty[]
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const item of items) {
+    const list = map.get(item.dmCtg) ?? [];
+    if (!list.includes(item.designDifficulty)) {
+      list.push(item.designDifficulty);
+      map.set(item.dmCtg, list);
+    }
+  }
+  for (const [, list] of map) {
+    list.sort();
+  }
+  return map;
+}
+
+export function designDifficultiesForDmCtg(
+  byDmCtg: Map<string, string[]>,
+  dmCtg: string
+): string[] {
+  const normalized = dmCtg.trim();
+  if (!normalized || normalized === "—") return [];
+  return byDmCtg.get(normalized) ?? [];
+}
+
+export function resolveDefaultDesignDifficulty(
+  options: string[],
+  productDifficulty?: string
+): string | undefined {
+  if (!options.length) return undefined;
+  const normalized = (productDifficulty ?? "").trim();
+  if (normalized && normalized !== "—" && options.includes(normalized)) {
+    return normalized;
+  }
+  return options[0];
+}
+
+export function filRateForDesignDifficulty(
+  difficultyRates: DifficultyRate[],
+  designDifficulty: string,
+  custType: string
+): number | undefined {
+  const direct = filRateForDifficulty(
+    difficultyRates,
+    designDifficulty,
+    custType
+  );
+  if (direct !== undefined) return direct;
+
+  const match = designDifficulty.match(DESIGN_DIFFICULTY_RATE_SUFFIX);
+  if (match) {
+    return filRateForDifficulty(difficultyRates, match[1], custType);
+  }
+
+  return undefined;
 }
 
 export function polSpForDmCtg(

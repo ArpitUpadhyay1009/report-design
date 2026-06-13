@@ -13,6 +13,7 @@ import {
   submitManagerRate,
   submitPolRate,
   type DifficultyRate,
+  type DesignWiseDifficulty,
   type FilledRate,
   type PolRate,
 } from "@/services/api";
@@ -25,7 +26,10 @@ import type {
   RateRole,
 } from "@/types/rateEntry";
 import {
+  buildDesignDifficultiesByDmCtg,
   categoryRatesFor,
+  designDifficultiesForDmCtg,
+  filRateForDesignDifficulty,
   filRateForDifficulty,
   isPolSpCode,
   patchFromDmCtg,
@@ -33,6 +37,7 @@ import {
   polCategoryCodesFrom,
   polDropdownOptionsForDmCtg,
   productForFilledRate,
+  resolveDefaultDesignDifficulty,
 } from "@/utils/rateEntryHelpers";
 import "./productsReport.css";
 
@@ -61,6 +66,7 @@ interface ProductsReportProps {
   filledRates?: FilledRate[];
   completedFilDesignIds?: string[];
   completedPolDesignIds?: string[];
+  designWiseDifficulties?: DesignWiseDifficulty[];
   rateDataStatus?: RateDataStatus;
   onLoadRateData?: () => void;
 }
@@ -89,6 +95,7 @@ export default function ProductsReport({
   filledRates,
   completedFilDesignIds,
   completedPolDesignIds,
+  designWiseDifficulties,
   rateDataStatus = "idle",
   onLoadRateData,
 }: ProductsReportProps) {
@@ -220,6 +227,11 @@ export default function ProductsReport({
     [polRates]
   );
 
+  const designDifficultiesByDmCtg = useMemo(
+    () => buildDesignDifficultiesByDmCtg(designWiseDifficulties ?? []),
+    [designWiseDifficulties]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -306,12 +318,26 @@ export default function ProductsReport({
 
       if (user.role === "FIL") {
         const e = rateEntries[p.id]?.FIL;
+        const options = designDifficultiesForDmCtg(
+          designDifficultiesByDmCtg,
+          p.polCtg
+        );
+        const difficulty =
+          e?.difficulty ?? resolveDefaultDesignDifficulty(options, p.difficulty);
+        const filRate =
+          e?.filRate ??
+          (difficulty
+            ? filRateForDesignDifficulty(
+                difficultyRates ?? [],
+                difficulty,
+                p.custType
+              )
+            : undefined);
         return (
-          !!e &&
-          typeof e.difficulty === "string" &&
-          e.difficulty.length > 0 &&
-          typeof e.filRate === "number" &&
-          Number.isFinite(e.filRate)
+          !!difficulty &&
+          difficulty.length > 0 &&
+          typeof filRate === "number" &&
+          Number.isFinite(filRate)
         );
       }
 
@@ -379,18 +405,25 @@ export default function ProductsReport({
 
       return false;
     },
-    [editableRole, user.role, rateEntries, polRatesByCategory, filledByDesign, difficultyRates]
+    [editableRole, user.role, rateEntries, polRatesByCategory, filledByDesign, difficultyRates, designDifficultiesByDmCtg]
   );
 
   const handleCardDifficultyChange = useCallback(
     (product: Product, code: string) => {
       if (!editableRole || user.role === "POL") return;
       const role: RateRole = user.role === "MANAGER" ? "MANAGER" : "FIL";
-      const filRate = filRateForDifficulty(
-        difficultyRates ?? [],
-        code,
-        product.custType
-      );
+      const filRate =
+        user.role === "FIL"
+          ? filRateForDesignDifficulty(
+              difficultyRates ?? [],
+              code,
+              product.custType
+            )
+          : filRateForDifficulty(
+              difficultyRates ?? [],
+              code,
+              product.custType
+            );
       handleRateChange(product.id, role, {
         difficulty: code,
         filRate,
@@ -463,12 +496,28 @@ export default function ProductsReport({
 
       try {
         if (user.role === "FIL") {
-          const e = rateEntries[product.id]!.FIL!;
+          const options = designDifficultiesForDmCtg(
+            designDifficultiesByDmCtg,
+            product.polCtg
+          );
+          const sectionEntry = rateEntries[product.id]?.FIL ?? {};
+          const difficulty =
+            sectionEntry.difficulty ??
+            resolveDefaultDesignDifficulty(options, product.difficulty);
+          const filRate =
+            sectionEntry.filRate ??
+            (difficulty
+              ? filRateForDesignDifficulty(
+                  difficultyRates ?? [],
+                  difficulty,
+                  product.custType
+                )
+              : undefined);
           const result = await submitFilRate({
             user_id: user.userId,
             design_id: product.designCode,
-            difficulty: e.difficulty as string,
-            fil_rate: e.filRate as number,
+            difficulty: difficulty as string,
+            fil_rate: filRate as number,
           });
           if (result.status === "1") {
             setLocalCompletedFil((prev) =>
@@ -581,6 +630,7 @@ export default function ProductsReport({
       polRatesByCategory,
       filledByDesign,
       difficultyRates,
+      designDifficultiesByDmCtg,
     ]
   );
 
@@ -592,8 +642,23 @@ export default function ProductsReport({
 
       const filled = filledByDesign.get(product.designCode);
       const sectionEntry = rateEntries[product.id]?.[editableRole] ?? {};
+      const filDifficultyOptions =
+        user.role === "FIL"
+          ? designDifficultiesForDmCtg(
+              designDifficultiesByDmCtg,
+              product.polCtg
+            )
+          : apiDifficultyCodes;
+      const defaultFilDifficulty =
+        user.role === "FIL"
+          ? resolveDefaultDesignDifficulty(
+              filDifficultyOptions,
+              product.difficulty
+            )
+          : undefined;
       const difficulty =
         sectionEntry.difficulty ??
+        defaultFilDifficulty ??
         (user.role === "MANAGER" ? filled?.difficulty : undefined);
       const dmCtg =
         sectionEntry.dmCtg ?? product.polCtg ?? filled?.dmCtg ?? "";
@@ -611,16 +676,22 @@ export default function ProductsReport({
       const filRate =
         sectionEntry.filRate ??
         (difficulty
-          ? filRateForDifficulty(
-              difficultyRates ?? [],
-              difficulty,
-              product.custType
-            )
+          ? user.role === "FIL"
+            ? filRateForDesignDifficulty(
+                difficultyRates ?? [],
+                difficulty,
+                product.custType
+              )
+            : filRateForDifficulty(
+                difficultyRates ?? [],
+                difficulty,
+                product.custType
+              )
           : undefined);
 
       return {
         role: user.role,
-        difficultyOptions: apiDifficultyCodes,
+        difficultyOptions: filDifficultyOptions,
         polDropdownOptions,
         polCategoryCodes,
         usePolDualDropdown: user.role === "POL",
@@ -660,6 +731,7 @@ export default function ProductsReport({
       polRates,
       apiDifficultyCodes,
       polCategoryCodes,
+      designDifficultiesByDmCtg,
       handleCardDifficultyChange,
       handleCardPolOptionChange,
       handleCardDmCtgChange,
@@ -1015,6 +1087,7 @@ export default function ProductsReport({
                 filledRates={filledRates}
                 completedFilDesignIds={completedFilDesignIds}
                 completedPolDesignIds={completedPolDesignIds}
+                designWiseDifficulties={designWiseDifficulties}
                 onListMetaChange={handleEntryListMetaChange}
               />
             ) : rateDataStatus === "error" ? (
@@ -1036,6 +1109,7 @@ export default function ProductsReport({
                 filledRates={filledRates}
                 completedFilDesignIds={completedFilDesignIds}
                 completedPolDesignIds={completedPolDesignIds}
+                designWiseDifficulties={designWiseDifficulties}
                 onListMetaChange={handleEntryListMetaChange}
               />
             ) : rateDataStatus === "error" ? (

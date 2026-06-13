@@ -8,6 +8,7 @@ import {
   submitManagerRate,
   submitPolRate,
   type DifficultyRate,
+  type DesignWiseDifficulty,
   type FilRateResponse,
   type ManagerRateResponse,
   type FilledRate,
@@ -18,11 +19,15 @@ import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
 import type { RateEntry, RateEntries, RateRole } from "@/types/rateEntry";
 import {
+  buildDesignDifficultiesByDmCtg,
+  designDifficultiesForDmCtg,
+  filRateForDesignDifficulty,
   isPolSpCode,
   patchFromDmCtg,
   patchFromPolSp,
   polDropdownOptionsForDmCtg,
   productForFilledRate,
+  resolveDefaultDesignDifficulty,
 } from "@/utils/rateEntryHelpers";
 import "./rateEntryView.css";
 
@@ -56,6 +61,7 @@ interface RateEntryViewProps {
   filledRates?: FilledRate[];
   completedFilDesignIds?: string[];
   completedPolDesignIds?: string[];
+  designWiseDifficulties?: DesignWiseDifficulty[];
   onListMetaChange?: (meta: { shown: number; total: number }) => void;
 }
 
@@ -105,6 +111,7 @@ export default function RateEntryView({
   filledRates,
   completedFilDesignIds,
   completedPolDesignIds,
+  designWiseDifficulties,
   onListMetaChange,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
@@ -215,8 +222,20 @@ export default function RateEntryView({
     return Array.from(new Set(codes)).sort();
   }, [polRates]);
 
+  const designDifficultiesByDmCtg = useMemo(
+    () => buildDesignDifficultiesByDmCtg(designWiseDifficulties ?? []),
+    [designWiseDifficulties]
+  );
+
   const buildFilRateLookup = (custType: string): FilRateLookup => {
     return (code: string): number | undefined => {
+      if (user.role === "FIL" && designWiseDifficulties?.length) {
+        return filRateForDesignDifficulty(
+          difficultyRates ?? [],
+          code,
+          custType
+        );
+      }
       const apiEntry = ratesByCode.get(code);
       if (apiEntry) {
         if (custType === "O") return apiEntry.normalRate ?? undefined;
@@ -266,12 +285,26 @@ export default function RateEntryView({
       if (mode === "completed") return false;
       if (user.role === "FIL") {
         const e = entries[p.id]?.FIL;
+        const options = designDifficultiesForDmCtg(
+          designDifficultiesByDmCtg,
+          p.polCtg
+        );
+        const difficulty =
+          e?.difficulty ?? resolveDefaultDesignDifficulty(options, p.difficulty);
+        const filRate =
+          e?.filRate ??
+          (difficulty
+            ? filRateForDesignDifficulty(
+                difficultyRates ?? [],
+                difficulty,
+                p.custType
+              )
+            : undefined);
         return (
-          !!e &&
-          typeof e.difficulty === "string" &&
-          e.difficulty.length > 0 &&
-          typeof e.filRate === "number" &&
-          Number.isFinite(e.filRate)
+          !!difficulty &&
+          difficulty.length > 0 &&
+          typeof filRate === "number" &&
+          Number.isFinite(filRate)
         );
       }
       if (user.role === "POL") {
@@ -319,7 +352,7 @@ export default function RateEntryView({
       }
       return false;
     },
-    [mode, user.role, entries, polRatesByCategory]
+    [mode, user.role, entries, polRatesByCategory, designDifficultiesByDmCtg, difficultyRates]
   );
 
   const submittableProducts = useMemo(
@@ -376,12 +409,27 @@ export default function RateEntryView({
 
     if (user.role === "FIL") {
       jobs = submittableProducts.map((p) => {
-        const e = entries[p.id]!.FIL!;
+        const options = designDifficultiesForDmCtg(
+          designDifficultiesByDmCtg,
+          p.polCtg
+        );
+        const e = entries[p.id]?.FIL ?? {};
+        const difficulty =
+          e.difficulty ?? resolveDefaultDesignDifficulty(options, p.difficulty);
+        const filRate =
+          e.filRate ??
+          (difficulty
+            ? filRateForDesignDifficulty(
+                difficultyRates ?? [],
+                difficulty,
+                p.custType
+              )
+            : undefined);
         const payload = {
           user_id: user.userId,
           design_id: p.designCode,
-          difficulty: e.difficulty as string,
-          fil_rate: e.filRate as number,
+          difficulty: difficulty as string,
+          fil_rate: filRate as number,
         };
         return { productId: p.id, run: () => submitFilRate(payload) };
       });
@@ -486,6 +534,8 @@ export default function RateEntryView({
     user.userId,
     user.role,
     polRatesByCategory,
+    designDifficultiesByDmCtg,
+    difficultyRates,
   ]);
 
   return (
@@ -722,6 +772,24 @@ export default function RateEntryView({
                           }
                         : lookupRates;
 
+                    const filDifficultyOptions =
+                      s === "FIL" &&
+                      user.role === "FIL" &&
+                      (designWiseDifficulties?.length ?? 0) > 0
+                        ? designDifficultiesForDmCtg(
+                            designDifficultiesByDmCtg,
+                            p.polCtg
+                          )
+                        : apiDifficultyCodes;
+
+                    const defaultFilDifficulty =
+                      s === "FIL" && user.role === "FIL"
+                        ? resolveDefaultDesignDifficulty(
+                            filDifficultyOptions,
+                            p.difficulty
+                          )
+                        : undefined;
+
                     return (
                       <SectionCells
                         key={s}
@@ -733,8 +801,11 @@ export default function RateEntryView({
                         entry={sectionEntry}
                         onPatch={(patch) => onChange(p.id, s, patch)}
                         difficultyCodes={
-                          s === "POL" ? localDifficultyCodes : apiDifficultyCodes
+                          s === "POL"
+                            ? localDifficultyCodes
+                            : filDifficultyOptions
                         }
+                        defaultDifficulty={defaultFilDifficulty}
                         getFilRate={buildFilRateLookup(p.custType)}
                         categoryRates={polSectionRates}
                         polCategoryCodes={polCategoryCodes}
@@ -906,6 +977,7 @@ interface SectionCellsProps {
   entry: RateEntry;
   onPatch: (patch: Partial<RateEntry>) => void;
   difficultyCodes: string[];
+  defaultDifficulty?: string;
   getFilRate: FilRateLookup;
   categoryRates: CategoryRates;
   polCategoryCodes: string[];
@@ -927,6 +999,7 @@ function SectionCells({
   entry,
   onPatch,
   difficultyCodes,
+  defaultDifficulty,
   getFilRate,
   categoryRates,
   polCategoryCodes,
@@ -943,6 +1016,11 @@ function SectionCells({
   const tdClass = `rate-entry__td rate-entry__td--${section.toLowerCase()}`;
 
   if (section === "FIL") {
+    const effectiveDifficulty = entry.difficulty ?? defaultDifficulty;
+    const effectiveFilRate =
+      entry.filRate ??
+      (effectiveDifficulty ? getFilRate(effectiveDifficulty) : undefined);
+
     return (
       <>
         <td className={tdClass}>
@@ -951,7 +1029,7 @@ function SectionCells({
           ) : (
             <DifficultyDropdown
               codes={difficultyCodes}
-              value={entry.difficulty}
+              value={effectiveDifficulty}
               disabled={!editable}
               onSelect={(code) => {
                 const filRate =
@@ -962,7 +1040,11 @@ function SectionCells({
           )}
         </td>
         <td className={`${tdClass} rate-entry__td--num`}>
-          {entry.filRate !== undefined ? inr(entry.filRate) : <span className="rate-entry__placeholder">—</span>}
+          {effectiveFilRate !== undefined ? (
+            inr(effectiveFilRate)
+          ) : (
+            <span className="rate-entry__placeholder">—</span>
+          )}
         </td>
       </>
     );
