@@ -27,7 +27,11 @@ import type {
 import {
   categoryRatesFor,
   filRateForDifficulty,
+  isPolSpCode,
+  patchFromDmCtg,
+  patchFromPolSp,
   polCategoryCodesFrom,
+  polDropdownOptionsForDmCtg,
   productForFilledRate,
 } from "@/utils/rateEntryHelpers";
 import "./productsReport.css";
@@ -107,6 +111,14 @@ export default function ProductsReport({
   const [cardSubmitMessages, setCardSubmitMessages] = useState<
     Record<string, string>
   >({});
+  const [entryListMeta, setEntryListMeta] = useState({ shown: 0, total: 0 });
+
+  const handleEntryListMetaChange = useCallback(
+    (meta: { shown: number; total: number }) => {
+      setEntryListMeta(meta);
+    },
+    []
+  );
 
   const showCardRateEntry =
     user.role === "FIL" || user.role === "POL" || user.role === "MANAGER";
@@ -307,18 +319,21 @@ export default function ProductsReport({
         const sectionEntry = rateEntries[p.id]?.POL ?? {};
         const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
         if (!effectiveDmCtg) return false;
-        const polEntry = polRatesByCategory.get(effectiveDmCtg);
-        if (!polEntry) return false;
-        const isO = p.custType === "O";
-        const isB = p.custType === "B";
-        if (!isO && !isB) return false;
-        const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
-        const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
-        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
+        const lookup = categoryRatesFor(
+          polRates ?? [],
+          effectiveDmCtg,
+          p.custType
+        );
+        const polRate = sectionEntry.polRate ?? lookup.polRate;
+        const prpRate = sectionEntry.prpRate ?? lookup.prpRate;
+        const dhagaRate = sectionEntry.dhagaRate ?? lookup.dhagaRate;
         return (
           typeof polRate === "number" &&
+          Number.isFinite(polRate) &&
           typeof prpRate === "number" &&
-          typeof dhagaRate === "number"
+          Number.isFinite(prpRate) &&
+          typeof dhagaRate === "number" &&
+          Number.isFinite(dhagaRate)
         );
       }
 
@@ -384,19 +399,53 @@ export default function ProductsReport({
     [editableRole, user.role, difficultyRates, handleRateChange]
   );
 
+  const handleCardPolOptionChange = useCallback(
+    (product: Product, option: string) => {
+      if (!editableRole || user.role !== "POL") return;
+      const patch = isPolSpCode(polRates ?? [], option)
+        ? patchFromPolSp(polRates ?? [], option, product.custType)
+        : patchFromDmCtg(polRates ?? [], option, product.custType);
+      handleRateChange(product.id, "POL", patch);
+    },
+    [editableRole, user.role, polRates, handleRateChange]
+  );
+
   const handleCardDmCtgChange = useCallback(
-    (product: Product, code: string) => {
-      if (!editableRole || user.role === "FIL") return;
-      const role: RateRole = user.role === "MANAGER" ? "MANAGER" : "POL";
-      const rates = categoryRatesFor(polRates ?? [], code, product.custType);
-      handleRateChange(product.id, role, {
-        dmCtg: code,
+    (product: Product, dmCtg: string) => {
+      if (!editableRole || user.role !== "MANAGER") return;
+      const rates = categoryRatesFor(polRates ?? [], dmCtg, product.custType);
+      handleRateChange(product.id, "MANAGER", {
+        dmCtg,
         polRate: rates.polRate,
         prpRate: rates.prpRate,
         dhagaRate: rates.dhagaRate,
       });
     },
     [editableRole, user.role, polRates, handleRateChange]
+  );
+
+  const handleCardPolRateChange = useCallback(
+    (product: Product, rate: number | undefined) => {
+      if (!editableRole || user.role !== "POL") return;
+      handleRateChange(product.id, "POL", { polRate: rate });
+    },
+    [editableRole, user.role, handleRateChange]
+  );
+
+  const handleCardPrpRateChange = useCallback(
+    (product: Product, rate: number | undefined) => {
+      if (!editableRole || user.role !== "POL") return;
+      handleRateChange(product.id, "POL", { prpRate: rate });
+    },
+    [editableRole, user.role, handleRateChange]
+  );
+
+  const handleCardDhagaRateChange = useCallback(
+    (product: Product, rate: number | undefined) => {
+      if (!editableRole || user.role !== "POL") return;
+      handleRateChange(product.id, "POL", { dhagaRate: rate });
+    },
+    [editableRole, user.role, handleRateChange]
   );
 
   const handleCardSubmit = useCallback(
@@ -439,16 +488,17 @@ export default function ProductsReport({
         } else if (user.role === "POL") {
           const sectionEntry = rateEntries[product.id]?.POL ?? {};
           const effectiveDmCtg = sectionEntry.dmCtg ?? product.polCtg;
-          const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
-          const isO = product.custType === "O";
+          const lookup = categoryRatesFor(
+            polRates ?? [],
+            effectiveDmCtg,
+            product.custType
+          );
           const result = await submitPolRate({
             user_id: user.userId,
             design_id: product.designCode,
-            pol_rate: (isO ? polEntry.normalPol : polEntry.brandPol) as number,
-            prp_rate: (isO ? polEntry.normalPrp : polEntry.brandPrp) as number,
-            dhaga_rate: (isO
-              ? polEntry.normalDhaga
-              : polEntry.brandDhaga) as number,
+            pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
+            prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
+            dhaga_rate: (sectionEntry.dhagaRate ?? lookup.dhagaRate) as number,
           });
           if (result.status === "1") {
             setLocalCompletedPol((prev) =>
@@ -547,6 +597,17 @@ export default function ProductsReport({
         (user.role === "MANAGER" ? filled?.difficulty : undefined);
       const dmCtg =
         sectionEntry.dmCtg ?? product.polCtg ?? filled?.dmCtg ?? "";
+      const polDropdownOptions = polDropdownOptionsForDmCtg(
+        polRates ?? [],
+        product.polCtg
+      );
+      const polDropdownValue =
+        sectionEntry.polSp ?? sectionEntry.dmCtg ?? product.polCtg;
+      const lookupRates = categoryRatesFor(
+        polRates ?? [],
+        dmCtg,
+        product.custType
+      );
       const filRate =
         sectionEntry.filRate ??
         (difficulty
@@ -556,30 +617,32 @@ export default function ProductsReport({
               product.custType
             )
           : undefined);
-      const polRatesResolved =
-        user.role === "POL" || user.role === "MANAGER"
-          ? sectionEntry.polRate !== undefined
-            ? {
-                polRate: sectionEntry.polRate,
-                prpRate: sectionEntry.prpRate,
-                dhagaRate: sectionEntry.dhagaRate,
-              }
-            : categoryRatesFor(polRates ?? [], dmCtg, product.custType)
-          : {};
 
       return {
         role: user.role,
         difficultyOptions: apiDifficultyCodes,
+        polDropdownOptions,
         polCategoryCodes,
+        usePolDualDropdown: user.role === "POL",
+        polRatesEditable: user.role === "POL",
         difficulty,
+        polDropdownValue,
         dmCtg,
         filRate,
-        polRate: polRatesResolved.polRate,
-        prpRate: polRatesResolved.prpRate,
-        dhagaRate: polRatesResolved.dhagaRate,
+        polRate: sectionEntry.polRate ?? lookupRates.polRate,
+        prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
+        dhagaRate: sectionEntry.dhagaRate ?? lookupRates.dhagaRate,
+        suggestedPolRate: lookupRates.polRate,
+        suggestedPrpRate: lookupRates.prpRate,
+        suggestedDhagaRate: lookupRates.dhagaRate,
         onDifficultyChange: (code) =>
           handleCardDifficultyChange(product, code),
+        onPolOptionChange: (option) =>
+          handleCardPolOptionChange(product, option),
         onDmCtgChange: (code) => handleCardDmCtgChange(product, code),
+        onPolRateChange: (rate) => handleCardPolRateChange(product, rate),
+        onPrpRateChange: (rate) => handleCardPrpRateChange(product, rate),
+        onDhagaRateChange: (rate) => handleCardDhagaRateChange(product, rate),
         onSubmit: () => handleCardSubmit(product),
         canSubmit: isCardProductValid(product),
         submitState: cardSubmitStates[product.id] ?? "idle",
@@ -598,7 +661,11 @@ export default function ProductsReport({
       apiDifficultyCodes,
       polCategoryCodes,
       handleCardDifficultyChange,
+      handleCardPolOptionChange,
       handleCardDmCtgChange,
+      handleCardPolRateChange,
+      handleCardPrpRateChange,
+      handleCardDhagaRateChange,
       handleCardSubmit,
       isCardProductValid,
       cardSubmitStates,
@@ -619,6 +686,48 @@ export default function ProductsReport({
       max,
     };
   }, [products]);
+
+  const listSummary = useMemo(() => {
+    if (view === "entry" || view === "completed") {
+      return {
+        shown: entryListMeta.shown,
+        total: entryListMeta.total,
+        label:
+          view === "completed"
+            ? "Completed designs"
+            : user.role === "MANAGER"
+            ? "Ready for review"
+            : "Pending designs",
+        hint:
+          view === "completed"
+            ? "Visible / completed total"
+            : "Visible / pending total",
+      };
+    }
+
+    const shown = Math.min(visibleCount, activeList.length);
+    const total = activeList.length;
+    const isPendingGrid = view === "grid" && showCardRateEntry;
+
+    return {
+      shown,
+      total,
+      label: isPendingGrid ? "Pending designs" : "Designs in view",
+      hint: query
+        ? "Visible / filtered total"
+        : isPendingGrid
+        ? "Visible / pending total"
+        : "Visible / total in list",
+    };
+  }, [
+    view,
+    entryListMeta,
+    user.role,
+    visibleCount,
+    activeList.length,
+    showCardRateEntry,
+    query,
+  ]);
 
   return (
     <section className="products-report">
@@ -644,13 +753,13 @@ export default function ProductsReport({
         />
         <StatCard
           label="Avg total rate"
-          value={`₹ ${inr(stats.avg)}`}
+          value={inr(stats.avg)}
           hint="FIL + POL + PRP + DHAGA"
           accent="amber"
           icon={
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path
-                d="M12 3v18M5 8h11a3 3 0 010 6H7m13 4l-3-3"
+                d="M4 19h16M6 16l3-5 3 3 4-7 2 4"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
@@ -662,7 +771,7 @@ export default function ProductsReport({
         />
         <StatCard
           label="Highest total"
-          value={`₹ ${inr(stats.max)}`}
+          value={inr(stats.max)}
           hint="Single design"
           accent="emerald"
           icon={
@@ -687,6 +796,24 @@ export default function ProductsReport({
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path
                 d="M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21a8 8 0 0116 0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+        />
+        <StatCard
+          label={listSummary.label}
+          value={`${listSummary.shown} / ${listSummary.total}`}
+          hint={listSummary.hint}
+          accent="violet"
+          icon={
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                d="M4 6h16M4 12h16M4 18h10"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
@@ -854,40 +981,6 @@ export default function ProductsReport({
         <DesignsError message={load.message} onRetry={onRetryLoad} />
       ) : (
         <>
-          {view !== "entry" && view !== "completed" ? (
-            <div className="products-report__result-meta">
-              {view === "grid" && showCardRateEntry ? (
-                <>
-                  Showing{" "}
-                  <strong>{Math.min(visibleCount, activeList.length)}</strong> of{" "}
-                  <strong>{activeList.length}</strong> pending designs
-                  {query ? (
-                    <>
-                      {" "}
-                      <span className="products-report__result-meta-muted">
-                        (filtered)
-                      </span>
-                    </>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  Showing{" "}
-                  <strong>{Math.min(visibleCount, activeList.length)}</strong> of{" "}
-                  <strong>{activeList.length}</strong> designs
-                  {query ? (
-                    <>
-                      {" "}
-                      <span className="products-report__result-meta-muted">
-                        (filtered from {products.length})
-                      </span>
-                    </>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ) : null}
-
           {view === "grid" && showCardRateEntry && rateDataStatus === "loading" ? (
             <div className="products-report__grid-rate-banner" role="status">
               <div className="products-report__rate-spinner" aria-hidden="true" />
@@ -922,6 +1015,7 @@ export default function ProductsReport({
                 filledRates={filledRates}
                 completedFilDesignIds={completedFilDesignIds}
                 completedPolDesignIds={completedPolDesignIds}
+                onListMetaChange={handleEntryListMetaChange}
               />
             ) : rateDataStatus === "error" ? (
               <RateDataError onRetry={() => onLoadRateData?.()} />
@@ -942,6 +1036,7 @@ export default function ProductsReport({
                 filledRates={filledRates}
                 completedFilDesignIds={completedFilDesignIds}
                 completedPolDesignIds={completedPolDesignIds}
+                onListMetaChange={handleEntryListMetaChange}
               />
             ) : rateDataStatus === "error" ? (
               <RateDataError onRetry={() => onLoadRateData?.()} />

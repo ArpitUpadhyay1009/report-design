@@ -175,6 +175,7 @@ export async function fetchDifficultyHeaders(): Promise<DifficultyRate[]> {
 
 export interface PolRate {
   category: string;
+  polSp: string;
   normalPol: number | null;
   normalPrp: number | null;
   normalDhaga: number | null;
@@ -191,6 +192,7 @@ interface PolRateRow {
   Brand_Pol: string | null;
   Brand_Prp: string | null;
   Brand_Dhaga: string | null;
+  POL_SP?: string | null;
 }
 
 interface PolRatesResponse {
@@ -206,9 +208,11 @@ export async function fetchPolRates(): Promise<PolRate[]> {
   return list
     .map<PolRate | null>((row) => {
       const category = (row?.DmCtg ?? "").trim();
+      const polSp = (row?.POL_SP ?? "").trim();
       if (!category) return null;
       return {
         category,
+        polSp,
         normalPol: parseNullableRate(row?.Normal_Pol),
         normalPrp: parseNullableRate(row?.Normal_Prp),
         normalDhaga: parseNullableRate(row?.Normal_Dhaga),

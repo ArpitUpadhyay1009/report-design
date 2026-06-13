@@ -553,6 +553,77 @@
   box-shadow: none;
 }
 
+.product-card__entry-rates--editable {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.product-card__entry-rate-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.product-card__entry-rate-input > span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.product-card__entry-rate-input--sky {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+.product-card__entry-rate-input--sky > span {
+  color: #0284c7;
+}
+
+.product-card__entry-rate-input--amber {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+.product-card__entry-rate-input--amber > span {
+  color: #d97706;
+}
+
+.product-card__entry-rate-input--emerald {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+.product-card__entry-rate-input--emerald > span {
+  color: #059669;
+}
+
+.product-card__rate-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  background: #ffffff;
+}
+
+.product-card__rate-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+.product-card__rate-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .product-card__entry-hint {
   font-size: 11px;
   font-weight: 600;

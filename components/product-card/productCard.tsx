@@ -55,15 +55,26 @@ const inr = (n: number): string =>
 export interface CardRateEntryProps {
   role: Role;
   difficultyOptions: string[];
+  polDropdownOptions: string[];
   polCategoryCodes: string[];
+  usePolDualDropdown: boolean;
+  polRatesEditable: boolean;
   difficulty?: string;
+  polDropdownValue: string;
   dmCtg: string;
   filRate?: number;
   polRate?: number;
   prpRate?: number;
   dhagaRate?: number;
+  suggestedPolRate?: number;
+  suggestedPrpRate?: number;
+  suggestedDhagaRate?: number;
   onDifficultyChange: (code: string) => void;
-  onDmCtgChange: (code: string) => void;
+  onPolOptionChange: (option: string) => void;
+  onDmCtgChange: (dmCtg: string) => void;
+  onPolRateChange: (rate: number | undefined) => void;
+  onPrpRateChange: (rate: number | undefined) => void;
+  onDhagaRateChange: (rate: number | undefined) => void;
   onSubmit: () => void;
   canSubmit: boolean;
   submitState: CardSubmitState;
@@ -223,16 +234,33 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                   <span>DmCtg</span>
                   <select
                     className="product-card__select"
-                    value={rateEntry.dmCtg}
+                    value={
+                      rateEntry.usePolDualDropdown
+                        ? rateEntry.polDropdownValue
+                        : rateEntry.dmCtg
+                    }
                     disabled={rateEntry.submitState === "submitting"}
-                    onChange={(e) => rateEntry.onDmCtgChange(e.target.value)}
+                    onChange={(e) =>
+                      rateEntry.usePolDualDropdown
+                        ? rateEntry.onPolOptionChange(e.target.value)
+                        : rateEntry.onDmCtgChange(e.target.value)
+                    }
                   >
                     <option value="">Select category…</option>
-                    {(
-                      rateEntry.dmCtg &&
-                      !rateEntry.polCategoryCodes.includes(rateEntry.dmCtg)
-                        ? [rateEntry.dmCtg, ...rateEntry.polCategoryCodes]
-                        : rateEntry.polCategoryCodes
+                    {(rateEntry.usePolDualDropdown
+                      ? rateEntry.polDropdownValue &&
+                        !rateEntry.polDropdownOptions.includes(
+                          rateEntry.polDropdownValue
+                        )
+                        ? [
+                            rateEntry.polDropdownValue,
+                            ...rateEntry.polDropdownOptions,
+                          ]
+                        : rateEntry.polDropdownOptions
+                      : rateEntry.dmCtg &&
+                        !rateEntry.polCategoryCodes.includes(rateEntry.dmCtg)
+                      ? [rateEntry.dmCtg, ...rateEntry.polCategoryCodes]
+                      : rateEntry.polCategoryCodes
                     ).map((code) => (
                       <option key={code} value={code}>
                         {code}
@@ -244,17 +272,63 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
             </div>
 
             {showPolField &&
-            rateEntry.polRate !== undefined &&
-            rateEntry.prpRate !== undefined &&
-            rateEntry.dhagaRate !== undefined ? (
-              <div className="product-card__entry-rates">
-                <EntryRatePill label="POL" value={rateEntry.polRate} tone="sky" />
-                <EntryRatePill label="PRP" value={rateEntry.prpRate} tone="amber" />
-                <EntryRatePill
-                  label="DHAGA"
-                  value={rateEntry.dhagaRate}
-                  tone="emerald"
-                />
+            (rateEntry.polRatesEditable ||
+              (rateEntry.polRate !== undefined &&
+                rateEntry.prpRate !== undefined &&
+                rateEntry.dhagaRate !== undefined)) ? (
+              <div
+                className={`product-card__entry-rates${
+                  rateEntry.polRatesEditable
+                    ? " product-card__entry-rates--editable"
+                    : ""
+                }`}
+              >
+                {rateEntry.polRatesEditable ? (
+                  <>
+                    <CardRateInput
+                      label="POL"
+                      value={rateEntry.polRate}
+                      suggested={rateEntry.suggestedPolRate}
+                      tone="sky"
+                      disabled={rateEntry.submitState === "submitting"}
+                      onChange={rateEntry.onPolRateChange}
+                    />
+                    <CardRateInput
+                      label="PRP"
+                      value={rateEntry.prpRate}
+                      suggested={rateEntry.suggestedPrpRate}
+                      tone="amber"
+                      disabled={rateEntry.submitState === "submitting"}
+                      onChange={rateEntry.onPrpRateChange}
+                    />
+                    <CardRateInput
+                      label="DHAGA"
+                      value={rateEntry.dhagaRate}
+                      suggested={rateEntry.suggestedDhagaRate}
+                      tone="emerald"
+                      disabled={rateEntry.submitState === "submitting"}
+                      onChange={rateEntry.onDhagaRateChange}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <EntryRatePill
+                      label="POL"
+                      value={rateEntry.polRate!}
+                      tone="sky"
+                    />
+                    <EntryRatePill
+                      label="PRP"
+                      value={rateEntry.prpRate!}
+                      tone="amber"
+                    />
+                    <EntryRatePill
+                      label="DHAGA"
+                      value={rateEntry.dhagaRate!}
+                      tone="emerald"
+                    />
+                  </>
+                )}
               </div>
             ) : null}
 
@@ -365,5 +439,57 @@ function EntryRatePill({ label, value, tone }: EntryRatePillProps) {
       <em>{label}</em>
       <strong>₹ {inr(value)}</strong>
     </span>
+  );
+}
+
+interface CardRateInputProps {
+  label: string;
+  value: number | undefined;
+  suggested?: number;
+  tone: "sky" | "amber" | "emerald";
+  disabled?: boolean;
+  onChange: (value: number | undefined) => void;
+}
+
+function CardRateInput({
+  label,
+  value,
+  suggested,
+  tone,
+  disabled,
+  onChange,
+}: CardRateInputProps) {
+  const display =
+    value !== undefined
+      ? String(value)
+      : suggested !== undefined
+      ? String(suggested)
+      : "";
+
+  return (
+    <label
+      className={`product-card__entry-rate-input product-card__entry-rate-input--${tone}`}
+    >
+      <span>{label}</span>
+      <input
+        type="number"
+        className="product-card__rate-input"
+        step="0.01"
+        min="0"
+        inputMode="decimal"
+        value={display}
+        placeholder="—"
+        disabled={disabled}
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          if (raw === "") {
+            onChange(undefined);
+            return;
+          }
+          const parsed = Number.parseFloat(raw);
+          onChange(Number.isFinite(parsed) ? parsed : undefined);
+        }}
+      />
+    </label>
   );
 }

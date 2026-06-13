@@ -4,6 +4,7 @@ export interface RateEntry {
   difficulty?: string;
   filRate?: number;
   dmCtg?: string;
+  polSp?: string;
   polCode?: string;
   polRate?: number;
   prpCode?: string;

@@ -47,6 +47,79 @@ export function categoryRatesFor(
   return {};
 }
 
+export function polSpForDmCtg(
+  polRates: PolRate[],
+  dmCtg: string
+): string | undefined {
+  const entry = polRates.find((r) => r.category === dmCtg);
+  return entry?.polSp || undefined;
+}
+
+export function polDropdownOptionsForDmCtg(
+  polRates: PolRate[],
+  dmCtg: string
+): string[] {
+  const normalized = dmCtg.trim();
+  if (!normalized || normalized === "—") return [];
+  const polSp = polSpForDmCtg(polRates, normalized);
+  if (polSp && polSp !== normalized) return [normalized, polSp];
+  return [normalized];
+}
+
+/** @deprecated Use polDropdownOptionsForDmCtg */
+export function polSpOptionsForDmCtg(
+  polRates: PolRate[],
+  dmCtg: string
+): string[] {
+  return polDropdownOptionsForDmCtg(polRates, dmCtg);
+}
+
+export function patchFromDmCtg(
+  polRates: PolRate[],
+  dmCtg: string,
+  custType: string
+): {
+  dmCtg: string;
+  polSp?: undefined;
+  polRate?: number;
+  prpRate?: number;
+  dhagaRate?: number;
+} {
+  const rates = categoryRatesFor(polRates, dmCtg, custType);
+  return {
+    dmCtg,
+    polSp: undefined,
+    polRate: rates.polRate,
+    prpRate: rates.prpRate,
+    dhagaRate: rates.dhagaRate,
+  };
+}
+
+export function isPolSpCode(polRates: PolRate[], code: string): boolean {
+  return polRates.some((r) => r.polSp === code);
+}
+
+export function patchFromPolSp(
+  polRates: PolRate[],
+  polSp: string,
+  custType: string
+): {
+  polSp: string;
+  dmCtg?: string;
+  polRate?: number;
+  prpRate?: number;
+  dhagaRate?: number;
+} {
+  const entry = polRates.find((r) => r.polSp === polSp);
+  if (!entry) return { polSp };
+  const rates = categoryRatesFor(polRates, entry.category, custType);
+  return {
+    polSp,
+    dmCtg: entry.category,
+    ...rates,
+  };
+}
+
 export function polCategoryCodesFrom(polRates: PolRate[]): string[] {
   return Array.from(
     new Set(polRates.map((r) => r.category).filter(Boolean))

@@ -17,7 +17,13 @@ import {
 import type { Product } from "@/types/product";
 import type { Profile, Role } from "@/types/profile";
 import type { RateEntry, RateEntries, RateRole } from "@/types/rateEntry";
-import { productForFilledRate } from "@/utils/rateEntryHelpers";
+import {
+  isPolSpCode,
+  patchFromDmCtg,
+  patchFromPolSp,
+  polDropdownOptionsForDmCtg,
+  productForFilledRate,
+} from "@/utils/rateEntryHelpers";
 import "./rateEntryView.css";
 
 type RateTable = Record<string, number>;
@@ -50,6 +56,7 @@ interface RateEntryViewProps {
   filledRates?: FilledRate[];
   completedFilDesignIds?: string[];
   completedPolDesignIds?: string[];
+  onListMetaChange?: (meta: { shown: number; total: number }) => void;
 }
 
 const inr = (n: number): string =>
@@ -98,6 +105,7 @@ export default function RateEntryView({
   filledRates,
   completedFilDesignIds,
   completedPolDesignIds,
+  onListMetaChange,
 }: RateEntryViewProps) {
   const sections = sectionsForRole(user.role);
   const showCheckboxes = mode === "pending";
@@ -164,6 +172,13 @@ export default function RateEntryView({
   const handleShowMore = useCallback(() => {
     setVisibleCount((n) => Math.min(n + PAGE_SIZE, displayProducts.length));
   }, [displayProducts.length]);
+
+  useEffect(() => {
+    onListMetaChange?.({
+      shown: Math.min(visibleCount, displayProducts.length),
+      total: displayProducts.length,
+    });
+  }, [visibleCount, displayProducts.length, onListMetaChange]);
 
   const designColSpan = showCheckboxes ? 4 : 3;
   const editableSection: RateRole | null =
@@ -263,18 +278,17 @@ export default function RateEntryView({
         const sectionEntry = entries[p.id]?.POL ?? {};
         const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
         if (!effectiveDmCtg) return false;
-        const polEntry = polRatesByCategory.get(effectiveDmCtg);
-        if (!polEntry) return false;
-        const isO = p.custType === "O";
-        const isB = p.custType === "B";
-        if (!isO && !isB) return false;
-        const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
-        const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
-        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
+        const lookup = buildCategoryRates(effectiveDmCtg, p.custType);
+        const polRate = sectionEntry.polRate ?? lookup.polRate;
+        const prpRate = sectionEntry.prpRate ?? lookup.prpRate;
+        const dhagaRate = sectionEntry.dhagaRate ?? lookup.dhagaRate;
         return (
           typeof polRate === "number" &&
+          Number.isFinite(polRate) &&
           typeof prpRate === "number" &&
-          typeof dhagaRate === "number"
+          Number.isFinite(prpRate) &&
+          typeof dhagaRate === "number" &&
+          Number.isFinite(dhagaRate)
         );
       }
       if (user.role === "MANAGER") {
@@ -375,16 +389,13 @@ export default function RateEntryView({
       jobs = submittableProducts.map((p) => {
         const sectionEntry = entries[p.id]?.POL ?? {};
         const effectiveDmCtg = sectionEntry.dmCtg ?? p.polCtg;
-        const polEntry = polRatesByCategory.get(effectiveDmCtg)!;
-        const isO = p.custType === "O";
+        const lookup = buildCategoryRates(effectiveDmCtg, p.custType);
         const payload = {
           user_id: user.userId,
           design_id: p.designCode,
-          pol_rate: (isO ? polEntry.normalPol : polEntry.brandPol) as number,
-          prp_rate: (isO ? polEntry.normalPrp : polEntry.brandPrp) as number,
-          dhaga_rate: (isO
-            ? polEntry.normalDhaga
-            : polEntry.brandDhaga) as number,
+          pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
+          prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
+          dhaga_rate: (sectionEntry.dhagaRate ?? lookup.dhagaRate) as number,
         };
         return { productId: p.id, run: () => submitPolRate(payload) };
       });
@@ -503,14 +514,6 @@ export default function RateEntryView({
           <span className="rate-entry__legend-pill rate-entry__legend-pill--mgr">Manager</span>
         </div>
       </div>
-
-      {displayProducts.length > 0 ? (
-        <div className="rate-entry__result-meta">
-          Showing{" "}
-          <strong>{Math.min(visibleCount, displayProducts.length)}</strong> of{" "}
-          <strong>{displayProducts.length}</strong> designs
-        </div>
-      ) : null}
 
       <div className="rate-entry__table-wrap">
         <table className="rate-entry__table">
@@ -679,6 +682,21 @@ export default function RateEntryView({
                         : sectionEntry.dmCtg ??
                           (isEditable ? p.polCtg : filled?.dmCtg ?? "");
 
+                    const polDropdownOptions = polDropdownOptionsForDmCtg(
+                      polRates ?? [],
+                      p.polCtg
+                    );
+
+                    const polDropdownValue =
+                      sectionEntry.polSp ??
+                      sectionEntry.dmCtg ??
+                      p.polCtg;
+
+                    const lookupRates = buildCategoryRates(
+                      effectiveDmCtg,
+                      p.custType
+                    );
+
                     const polSectionRates: CategoryRates =
                       mode === "completed" &&
                       isEditable &&
@@ -689,13 +707,20 @@ export default function RateEntryView({
                             prpRate: p.prpRate,
                             dhagaRate: p.dhagaRate,
                           }
+                        : s === "POL" && isEditable && user.role === "POL"
+                        ? {
+                            polRate: sectionEntry.polRate ?? lookupRates.polRate,
+                            prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
+                            dhagaRate:
+                              sectionEntry.dhagaRate ?? lookupRates.dhagaRate,
+                          }
                         : s === "POL" && !isEditable
                         ? {
                             polRate: sectionEntry.polRate,
                             prpRate: sectionEntry.prpRate,
                             dhagaRate: sectionEntry.dhagaRate,
                           }
-                        : buildCategoryRates(effectiveDmCtg, p.custType);
+                        : lookupRates;
 
                     return (
                       <SectionCells
@@ -714,6 +739,30 @@ export default function RateEntryView({
                         categoryRates={polSectionRates}
                         polCategoryCodes={polCategoryCodes}
                         dmCtgValue={effectiveDmCtg}
+                        polDropdownOptions={polDropdownOptions}
+                        polDropdownValue={polDropdownValue}
+                        usePolDualDropdown={
+                          s === "POL" &&
+                          isEditable &&
+                          user.role === "POL" &&
+                          mode === "pending"
+                        }
+                        getCategoryRates={(dmCtg) =>
+                          buildCategoryRates(dmCtg, p.custType)
+                        }
+                        resolveDmCtgPatch={(dmCtg) =>
+                          patchFromDmCtg(polRates ?? [], dmCtg, p.custType)
+                        }
+                        resolvePolSpPatch={(polSp) =>
+                          patchFromPolSp(polRates ?? [], polSp, p.custType)
+                        }
+                        polRatesForLookup={polRates ?? []}
+                        ratesEditable={
+                          s === "POL" &&
+                          isEditable &&
+                          user.role === "POL" &&
+                          mode === "pending"
+                        }
                       />
                     );
                   })}
@@ -750,7 +799,7 @@ export default function RateEntryView({
                 {selectedCount === 0
                   ? "Check at least one row to submit."
                   : user.role === "POL"
-                  ? "Selected rows need a valid DmCtg and rates before submitting."
+                  ? "Selected rows need valid POL, PRP, and DHAGA rates before submitting."
                   : "Selected rows need a difficulty before submitting."}
               </span>
             ) : (
@@ -861,6 +910,14 @@ interface SectionCellsProps {
   categoryRates: CategoryRates;
   polCategoryCodes: string[];
   dmCtgValue: string;
+  polDropdownOptions?: string[];
+  polDropdownValue?: string;
+  usePolDualDropdown?: boolean;
+  getCategoryRates?: (dmCtg: string) => CategoryRates;
+  resolveDmCtgPatch?: (dmCtg: string) => Partial<RateEntry>;
+  resolvePolSpPatch?: (polSp: string) => Partial<RateEntry>;
+  polRatesForLookup?: PolRate[];
+  ratesEditable?: boolean;
 }
 
 function SectionCells({
@@ -874,6 +931,14 @@ function SectionCells({
   categoryRates,
   polCategoryCodes,
   dmCtgValue,
+  polDropdownOptions,
+  polDropdownValue,
+  usePolDualDropdown = false,
+  getCategoryRates,
+  resolveDmCtgPatch,
+  resolvePolSpPatch,
+  polRatesForLookup,
+  ratesEditable = false,
 }: SectionCellsProps) {
   const tdClass = `rate-entry__td rate-entry__td--${section.toLowerCase()}`;
 
@@ -904,10 +969,52 @@ function SectionCells({
   }
 
   if (section === "POL") {
-    const dropdownCodes =
-      dmCtgValue && !polCategoryCodes.includes(dmCtgValue)
-        ? [dmCtgValue, ...polCategoryCodes]
-        : polCategoryCodes;
+    const dropdownCodes = usePolDualDropdown
+      ? (polDropdownOptions ?? [])
+      : dmCtgValue && !polCategoryCodes.includes(dmCtgValue)
+      ? [dmCtgValue, ...polCategoryCodes]
+      : polCategoryCodes;
+
+    const dropdownValue = usePolDualDropdown
+      ? polDropdownValue ?? dmCtgValue
+      : dmCtgValue;
+
+    const handleDropdownSelect = (code: string | undefined) => {
+      if (!code) {
+        onPatch(
+          usePolDualDropdown
+            ? { polSp: undefined, dmCtg: undefined }
+            : { dmCtg: undefined }
+        );
+        return;
+      }
+      if (
+        ratesEditable &&
+        usePolDualDropdown &&
+        resolvePolSpPatch &&
+        resolveDmCtgPatch &&
+        polRatesForLookup
+      ) {
+        if (isPolSpCode(polRatesForLookup, code)) {
+          onPatch(resolvePolSpPatch(code));
+        } else {
+          onPatch(resolveDmCtgPatch(code));
+        }
+        return;
+      }
+      if (ratesEditable && getCategoryRates && code) {
+        const rates = getCategoryRates(code);
+        onPatch({
+          dmCtg: code,
+          polRate: rates.polRate,
+          prpRate: rates.prpRate,
+          dhagaRate: rates.dhagaRate,
+        });
+        return;
+      }
+      onPatch(usePolDualDropdown ? { polSp: code } : { dmCtg: code });
+    };
+
     return (
       <>
         <td className={tdClass}>
@@ -916,15 +1023,43 @@ function SectionCells({
           ) : (
             <DifficultyDropdown
               codes={dropdownCodes}
-              value={dmCtgValue}
+              value={dropdownValue || undefined}
               disabled={!editable}
-              onSelect={(code) => onPatch({ dmCtg: code })}
+              onSelect={handleDropdownSelect}
             />
           )}
         </td>
-        <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
-        <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
-        <DerivedRateCell tdClass={tdClass} value={categoryRates.dhagaRate} />
+        {ratesEditable ? (
+          <>
+            <EditableRateCell
+              tdClass={tdClass}
+              value={entry.polRate}
+              suggested={categoryRates.polRate}
+              onChange={(rate) => onPatch({ polRate: rate })}
+            />
+            <EditableRateCell
+              tdClass={tdClass}
+              value={entry.prpRate}
+              suggested={categoryRates.prpRate}
+              onChange={(rate) => onPatch({ prpRate: rate })}
+            />
+            <EditableRateCell
+              tdClass={tdClass}
+              value={entry.dhagaRate}
+              suggested={categoryRates.dhagaRate}
+              onChange={(rate) => onPatch({ dhagaRate: rate })}
+            />
+          </>
+        ) : (
+          <>
+            <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
+            <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
+            <DerivedRateCell
+              tdClass={tdClass}
+              value={categoryRates.dhagaRate}
+            />
+          </>
+        )}
       </>
     );
   }
@@ -982,6 +1117,47 @@ function DerivedRateCell({ tdClass, value }: DerivedRateCellProps) {
       ) : (
         <span className="rate-entry__placeholder">—</span>
       )}
+    </td>
+  );
+}
+
+interface EditableRateCellProps {
+  tdClass: string;
+  value: number | undefined;
+  suggested?: number;
+  onChange: (value: number | undefined) => void;
+}
+
+function EditableRateCell({
+  tdClass,
+  value,
+  suggested,
+  onChange,
+}: EditableRateCellProps) {
+  const display =
+    value !== undefined ? String(value) : suggested !== undefined ? String(suggested) : "";
+
+  return (
+    <td className={`${tdClass} rate-entry__td--num`}>
+      <input
+        type="number"
+        className="rate-entry__rate-input"
+        step="0.01"
+        min="0"
+        inputMode="decimal"
+        value={display}
+        placeholder="—"
+        aria-label="Rate value"
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          if (raw === "") {
+            onChange(undefined);
+            return;
+          }
+          const parsed = Number.parseFloat(raw);
+          onChange(Number.isFinite(parsed) ? parsed : undefined);
+        }}
+      />
     </td>
   );
 }
