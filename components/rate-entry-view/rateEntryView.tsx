@@ -204,6 +204,9 @@ export default function RateEntryView({
   }, [visibleCount, displayProducts.length, onListMetaChange]);
 
   const designColSpan = showCheckboxes ? 4 : 3;
+  const isSuperManager =
+    user.empCode.trim().toUpperCase() === "FS10493" &&
+    String(user.empRoleId).trim() === "5";
   const editableSection: RateRole | null =
     user.role === "POL"
       ? "POL"
@@ -611,6 +614,62 @@ export default function RateEntryView({
     filledByDesign,
   ]);
 
+  const handleExportExcel = useCallback(() => {
+    if (!displayProducts.length) return;
+
+    const headers = [
+      "Design Code",
+      "Manager",
+      "Customer Type",
+      "Parts",
+      "Manufacturer",
+      "Department",
+      "POL Category",
+      "Difficulty",
+      "FIL Rate",
+      "POL Rate",
+      "PRP Rate",
+      "DHAGA Rate",
+      "Total",
+    ];
+
+    const escapeCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+    const rows = displayProducts.map((p) => [
+      p.designCode,
+      p.managerName,
+      p.custType,
+      String(p.numberOfParts),
+      p.manufacturer,
+      p.dep,
+      p.polCtg,
+      p.difficulty,
+      String(p.filRate),
+      String(p.polRate),
+      String(p.prpRate),
+      String(p.dhagaRate),
+      String(
+        p.filRate + p.polRate + p.prpRate + p.dhagaRate
+      ),
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCell).join(","))
+      .join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `rate-entry-export-${mode}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [displayProducts, mode]);
+
   return (
     <div className="rate-entry">
       <div className="rate-entry__intro">
@@ -991,20 +1050,32 @@ export default function RateEntryView({
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            className="rate-entry__submit-btn"
-            onClick={handleSubmit}
-            disabled={submitting || submittableProducts.length === 0}
-          >
-            {submitting
-              ? "Submitting…"
-              : user.role === "FIL"
-              ? "Submit FIL rates"
-              : user.role === "POL"
-              ? "Submit POL rates"
-              : "Submit Manager approvals"}
-          </button>
+          <div className="rate-entry__submit-actions">
+            {isSuperManager ? (
+              <button
+                type="button"
+                className="rate-entry__export-btn"
+                onClick={handleExportExcel}
+                disabled={displayProducts.length === 0}
+              >
+                Export Excel
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rate-entry__submit-btn"
+              onClick={handleSubmit}
+              disabled={submitting || submittableProducts.length === 0}
+            >
+              {submitting
+                ? "Submitting…"
+                : user.role === "FIL"
+                ? "Submit FIL rates"
+                : user.role === "POL"
+                ? "Submit POL rates"
+                : "Submit Manager approvals"}
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

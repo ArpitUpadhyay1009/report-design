@@ -589,6 +589,7 @@ export const ROLE_BY_EMP_ROLE_ID: Record<string, Role> = {
 export const ROLE_BY_EMP_CODE: Record<string, Role> = {
   "31615": "POL",
   "FW1950": "FIL",
+  "FS10493": "MANAGER",
 };
 
 const ROLE_BY_EMP_CODE_NORMALIZED: Record<string, Role> = Object.fromEntries(
