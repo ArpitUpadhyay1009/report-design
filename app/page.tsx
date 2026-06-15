@@ -103,11 +103,15 @@ export default function Home() {
     // Always send roleId (raw EmpRoleid from login). Only send managerName
     // when the logged-in user is a MANAGER — for FIL / POL the SP scopes
     // results from the role alone, so we deliberately leave it off.
+    // Also exclude managerName for super manager (FS10493) so they see all data.
+    const isSuperManager = user.empCode.trim().toUpperCase() === "FS10493" &&
+      String(user.empRoleId).trim() === "5";
+
     fetchDesignApprovals({
       fromDate,
       toDate,
       roleId: user.empRoleId,
-      managerName: user.role === "MANAGER" ? user.name : undefined,
+      managerName: (user.role === "MANAGER" && !isSuperManager) ? user.name : undefined,
     })
       .then((products) => {
         if (sessionRef.current !== session) return;
