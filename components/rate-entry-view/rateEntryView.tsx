@@ -46,7 +46,6 @@ interface SubmitSummary {
 interface CategoryRates {
   polRate?: number;
   prpRate?: number;
-  dhagaRate?: number;
 }
 
 export type RateEntryMode = "pending" | "completed";
@@ -88,8 +87,8 @@ const sectionsForRole = (role: Role): RateRole[] => {
 
 const colsPerSection: Record<RateRole, number> = {
   FIL: 2,
-  POL: 4,
-  MANAGER: 6,
+  POL: 3,
+  MANAGER: 5,
 };
 
 const PAGE_SIZE = 10;
@@ -274,14 +273,12 @@ export default function RateEntryView({
       return {
         polRate: entry.normalPol ?? undefined,
         prpRate: entry.normalPrp ?? undefined,
-        dhagaRate: entry.normalDhaga ?? undefined,
       };
     }
     if (custType === "B") {
       return {
         polRate: entry.brandPol ?? undefined,
         prpRate: entry.brandPrp ?? undefined,
-        dhagaRate: entry.brandDhaga ?? undefined,
       };
     }
     return {};
@@ -336,14 +333,11 @@ export default function RateEntryView({
         const lookup = buildCategoryRates(effectiveDmCtg, p.custType);
         const polRate = sectionEntry.polRate ?? lookup.polRate;
         const prpRate = sectionEntry.prpRate ?? lookup.prpRate;
-        const dhagaRate = sectionEntry.dhagaRate ?? lookup.dhagaRate;
         return (
           typeof polRate === "number" &&
           Number.isFinite(polRate) &&
           typeof prpRate === "number" &&
-          Number.isFinite(prpRate) &&
-          typeof dhagaRate === "number" &&
-          Number.isFinite(dhagaRate)
+          Number.isFinite(prpRate)
         );
       }
       if (user.role === "MANAGER") {
@@ -388,14 +382,11 @@ export default function RateEntryView({
         const lookup = buildCategoryRates(effectiveDmCtg, p.custType);
         const polRate = sectionEntry.polRate ?? lookup.polRate;
         const prpRate = sectionEntry.prpRate ?? lookup.prpRate;
-        const dhagaRate = sectionEntry.dhagaRate ?? lookup.dhagaRate;
         return (
           typeof polRate === "number" &&
           Number.isFinite(polRate) &&
           typeof prpRate === "number" &&
-          Number.isFinite(prpRate) &&
-          typeof dhagaRate === "number" &&
-          Number.isFinite(dhagaRate)
+          Number.isFinite(prpRate)
         );
       }
       return false;
@@ -496,7 +487,6 @@ export default function RateEntryView({
           design_id: p.designCode,
           pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
           prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
-          dhaga_rate: (sectionEntry.dhagaRate ?? lookup.dhagaRate) as number,
         };
         return { productId: p.id, run: () => submitPolRate(payload) };
       });
@@ -539,8 +529,6 @@ export default function RateEntryView({
           manager_fil_rate: filRate as number,
           manager_pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
           manager_prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
-          manager_dhaga_rate: (sectionEntry.dhagaRate ??
-            lookup.dhagaRate) as number,
         };
         return { productId: p.id, run: () => submitManagerRate(payload) };
       });
@@ -629,7 +617,6 @@ export default function RateEntryView({
       "FIL Rate",
       "POL Rate",
       "PRP Rate",
-      "DHAGA Rate",
       "Total",
     ];
 
@@ -647,9 +634,8 @@ export default function RateEntryView({
       String(p.filRate),
       String(p.polRate),
       String(p.prpRate),
-      String(p.dhagaRate),
       String(
-        p.filRate + p.polRate + p.prpRate + p.dhagaRate
+        p.filRate + p.polRate + p.prpRate
       ),
     ]);
 
@@ -850,7 +836,6 @@ export default function RateEntryView({
                           dmCtg: filled.dmCtg,
                           polRate: filled.polRate,
                           prpRate: filled.prpRate,
-                          dhagaRate: filled.dhagaRate,
                         };
                       }
                     } else if (
@@ -894,20 +879,16 @@ export default function RateEntryView({
                         ? {
                             polRate: p.polRate,
                             prpRate: p.prpRate,
-                            dhagaRate: p.dhagaRate,
                           }
                         : s === "POL" && isEditable && user.role === "POL"
                         ? {
                             polRate: sectionEntry.polRate ?? lookupRates.polRate,
                             prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
-                            dhagaRate:
-                              sectionEntry.dhagaRate ?? lookupRates.dhagaRate,
                           }
                         : s === "POL" && !isEditable
                         ? {
                             polRate: sectionEntry.polRate,
                             prpRate: sectionEntry.prpRate,
-                            dhagaRate: sectionEntry.dhagaRate,
                           }
                         : s === "MANAGER" &&
                           isEditable &&
@@ -915,8 +896,6 @@ export default function RateEntryView({
                         ? {
                             polRate: sectionEntry.polRate ?? lookupRates.polRate,
                             prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
-                            dhagaRate:
-                              sectionEntry.dhagaRate ?? lookupRates.dhagaRate,
                           }
                         : lookupRates;
 
@@ -1024,7 +1003,7 @@ export default function RateEntryView({
                 {selectedCount === 0
                   ? "Check at least one row to submit."
                   : user.role === "POL"
-                  ? "Selected rows need valid POL, PRP, and DHAGA rates before submitting."
+                  ? "Selected rows need valid POL and PRP rates before submitting."
                   : "Selected rows need a difficulty before submitting."}
               </span>
             ) : (
@@ -1120,7 +1099,6 @@ function renderSectionHeaders(section: RateRole) {
         <th className={className}>DmCtg</th>
         <th className={className}>POL Rate</th>
         <th className={className}>PRP Rate</th>
-        <th className={className}>DHAGA Rate</th>
       </>
     );
   }
@@ -1131,7 +1109,6 @@ function renderSectionHeaders(section: RateRole) {
       <th className={className}>DmCtg</th>
       <th className={className}>POL Rate</th>
       <th className={className}>PRP Rate</th>
-      <th className={className}>DHAGA Rate</th>
     </>
   );
 }
@@ -1256,7 +1233,6 @@ function SectionCells({
           dmCtg: code,
           polRate: rates.polRate,
           prpRate: rates.prpRate,
-          dhagaRate: rates.dhagaRate,
         });
         return;
       }
@@ -1291,21 +1267,11 @@ function SectionCells({
               suggested={categoryRates.prpRate}
               onChange={(rate) => onPatch({ prpRate: rate })}
             />
-            <EditableRateCell
-              tdClass={tdClass}
-              value={entry.dhagaRate}
-              suggested={categoryRates.dhagaRate}
-              onChange={(rate) => onPatch({ dhagaRate: rate })}
-            />
           </>
         ) : (
           <>
             <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
             <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
-            <DerivedRateCell
-              tdClass={tdClass}
-              value={categoryRates.dhagaRate}
-            />
           </>
         )}
       </>
@@ -1352,7 +1318,6 @@ function SectionCells({
         dmCtg: code,
         polRate: rates.polRate,
         prpRate: rates.prpRate,
-        dhagaRate: rates.dhagaRate,
       });
       return;
     }
@@ -1394,7 +1359,6 @@ function SectionCells({
       </td>
       <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
       <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
-      <DerivedRateCell tdClass={tdClass} value={categoryRates.dhagaRate} />
     </>
   );
 }

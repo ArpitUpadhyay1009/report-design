@@ -19,7 +19,7 @@ import {
 } from "@/services/api";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
-import type { Profile } from "@/types/profile";
+import type { Profile, Role } from "@/types/profile";
 import type {
   RateEntries,
   RateEntry,
@@ -369,14 +369,11 @@ export default function ProductsReport({
         );
         const polRate = sectionEntry.polRate ?? lookup.polRate;
         const prpRate = sectionEntry.prpRate ?? lookup.prpRate;
-        const dhagaRate = sectionEntry.dhagaRate ?? lookup.dhagaRate;
         return (
           typeof polRate === "number" &&
           Number.isFinite(polRate) &&
           typeof prpRate === "number" &&
-          Number.isFinite(prpRate) &&
-          typeof dhagaRate === "number" &&
-          Number.isFinite(dhagaRate)
+          Number.isFinite(prpRate)
         );
       }
 
@@ -426,11 +423,9 @@ export default function ProductsReport({
         if (!isO && !isB) return false;
         const polRate = isO ? polEntry.normalPol : polEntry.brandPol;
         const prpRate = isO ? polEntry.normalPrp : polEntry.brandPrp;
-        const dhagaRate = isO ? polEntry.normalDhaga : polEntry.brandDhaga;
         return (
           typeof polRate === "number" &&
-          typeof prpRate === "number" &&
-          typeof dhagaRate === "number"
+          typeof prpRate === "number"
         );
       }
 
@@ -482,7 +477,6 @@ export default function ProductsReport({
         dmCtg,
         polRate: rates.polRate,
         prpRate: rates.prpRate,
-        dhagaRate: rates.dhagaRate,
       });
     },
     [editableRole, user.role, polRates, handleRateChange]
@@ -504,13 +498,6 @@ export default function ProductsReport({
     [editableRole, user.role, handleRateChange]
   );
 
-  const handleCardDhagaRateChange = useCallback(
-    (product: Product, rate: number | undefined) => {
-      if (!editableRole || user.role !== "POL") return;
-      handleRateChange(product.id, "POL", { dhagaRate: rate });
-    },
-    [editableRole, user.role, handleRateChange]
-  );
 
   const handleCardSubmit = useCallback(
     async (product: Product) => {
@@ -583,7 +570,6 @@ export default function ProductsReport({
             design_id: product.designCode,
             pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
             prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
-            dhaga_rate: (sectionEntry.dhagaRate ?? lookup.dhagaRate) as number,
           });
           if (result.status === "1") {
             setLocalCompletedPol((prev) =>
@@ -642,8 +628,6 @@ export default function ProductsReport({
             manager_fil_rate: filRate as number,
             manager_pol_rate: (sectionEntry.polRate ?? lookup.polRate) as number,
             manager_prp_rate: (sectionEntry.prpRate ?? lookup.prpRate) as number,
-            manager_dhaga_rate: (sectionEntry.dhagaRate ??
-              lookup.dhagaRate) as number,
           });
           if (result.status === "1") {
             setLocalCompletedManager((prev) =>
@@ -750,17 +734,17 @@ export default function ProductsReport({
         polDropdownOptions,
         polCategoryCodes,
         usePolDualDropdown: user.role === "POL" || user.role === "MANAGER",
-        polRatesEditable: user.role === "POL",
+        polRatesEditable:
+          user.role === "POL" &&
+          sectionEntry.polSp !== undefined,
         difficulty,
         polDropdownValue,
         dmCtg,
         filRate,
         polRate: sectionEntry.polRate ?? lookupRates.polRate,
         prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
-        dhagaRate: sectionEntry.dhagaRate ?? lookupRates.dhagaRate,
         suggestedPolRate: lookupRates.polRate,
         suggestedPrpRate: lookupRates.prpRate,
-        suggestedDhagaRate: lookupRates.dhagaRate,
         onDifficultyChange: (code) =>
           handleCardDifficultyChange(product, code),
         onPolOptionChange: (option) =>
@@ -768,7 +752,6 @@ export default function ProductsReport({
         onDmCtgChange: (code) => handleCardDmCtgChange(product, code),
         onPolRateChange: (rate) => handleCardPolRateChange(product, rate),
         onPrpRateChange: (rate) => handleCardPrpRateChange(product, rate),
-        onDhagaRateChange: (rate) => handleCardDhagaRateChange(product, rate),
         onSubmit: () => handleCardSubmit(product),
         canSubmit: isCardProductValid(product),
         submitState: cardSubmitStates[product.id] ?? "idle",
@@ -793,7 +776,6 @@ export default function ProductsReport({
       handleCardDmCtgChange,
       handleCardPolRateChange,
       handleCardPrpRateChange,
-      handleCardDhagaRateChange,
       handleCardSubmit,
       isCardProductValid,
       cardSubmitStates,
@@ -882,7 +864,7 @@ export default function ProductsReport({
         <StatCard
           label="Avg total rate"
           value={inr(stats.avg)}
-          hint="FIL + POL + PRP + DHAGA"
+          hint="FIL + POL + PRP"
           accent="amber"
           icon={
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -1247,7 +1229,13 @@ export default function ProductsReport({
                         As per standard norms
                       </th>
                       <th
-                        colSpan={5}
+                        colSpan={
+                          user.role === "POL"
+                            ? 3
+                            : user.role === "FIL"
+                            ? 2
+                            : 5
+                        }
                         className="products-report__th-group products-report__th-group--accent"
                       >
                         System rate
@@ -1257,19 +1245,15 @@ export default function ProductsReport({
                       </th>
                     </tr>
                     <tr>
-                      <th>MFR</th>
-                      <th>Dep</th>
-                      <th>POL CTG</th>
                       <th>Diff</th>
-                      <th>FIL</th>
-                      <th>POL</th>
-                      <th>PRP</th>
-                      <th>DHAGA</th>
+                      {user.role !== "POL" ? <th>FIL</th> : null}
+                      {user.role !== "FIL" ? <th>POL</th> : null}
+                      {user.role !== "FIL" ? <th>PRP</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {visibleProducts.map((p) => (
-                      <ProductRow key={p.id} product={p} />
+                      <ProductRow key={p.id} product={p} role={user.role} />
                     ))}
                   </tbody>
                 </table>

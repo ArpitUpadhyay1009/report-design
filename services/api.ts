@@ -296,7 +296,7 @@ export interface PolRatePayload {
   design_id: string;
   pol_rate: number;
   prp_rate: number;
-  dhaga_rate: number;
+  dhaga_rate?: number;
 }
 
 export interface PolRateResponse {
@@ -314,7 +314,9 @@ export async function submitPolRate(
   body.append("design_id", payload.design_id);
   body.append("pol_rate", String(payload.pol_rate));
   body.append("prp_rate", String(payload.prp_rate));
-  body.append("dhaga_rate", String(payload.dhaga_rate));
+  if (payload.dhaga_rate !== undefined) {
+    body.append("dhaga_rate", String(payload.dhaga_rate));
+  }
 
   const response = await apiClient.post<PolRateResponse>(
     "/add-POL-Rate",
@@ -331,7 +333,7 @@ export interface ManagerRatePayload {
   manager_fil_rate: number;
   manager_pol_rate: number;
   manager_prp_rate: number;
-  manager_dhaga_rate: number;
+  manager_dhaga_rate?: number;
 }
 
 export interface ManagerRateResponse {
@@ -351,7 +353,9 @@ export async function submitManagerRate(
   body.append("manager_fil_rate", String(payload.manager_fil_rate));
   body.append("manager_pol_rate", String(payload.manager_pol_rate));
   body.append("manager_prp_rate", String(payload.manager_prp_rate));
-  body.append("manager_dhaga_rate", String(payload.manager_dhaga_rate));
+  if (payload.manager_dhaga_rate !== undefined) {
+    body.append("manager_dhaga_rate", String(payload.manager_dhaga_rate));
+  }
 
   const response = await apiClient.post<ManagerRateResponse>(
     "/add-Manager-Rate",

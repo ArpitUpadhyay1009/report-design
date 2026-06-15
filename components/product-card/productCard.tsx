@@ -65,16 +65,13 @@ export interface CardRateEntryProps {
   filRate?: number;
   polRate?: number;
   prpRate?: number;
-  dhagaRate?: number;
   suggestedPolRate?: number;
   suggestedPrpRate?: number;
-  suggestedDhagaRate?: number;
   onDifficultyChange: (code: string) => void;
   onPolOptionChange: (option: string) => void;
   onDmCtgChange: (dmCtg: string) => void;
   onPolRateChange: (rate: number | undefined) => void;
   onPrpRateChange: (rate: number | undefined) => void;
-  onDhagaRateChange: (rate: number | undefined) => void;
   onSubmit: () => void;
   canSubmit: boolean;
   submitState: CardSubmitState;
@@ -89,12 +86,20 @@ interface ProductCardProps {
 export default function ProductCard({ product, rateEntry }: ProductCardProps) {
   const cust = custMetaFor(product.custType);
   const diff = difficultyMetaFor(product.difficulty);
-  const total = totalRate(product);
+  const total = rateEntry
+    ? rateEntry.role === "POL"
+      ? product.polRate + product.prpRate
+      : rateEntry.role === "FIL"
+      ? product.filRate
+      : totalRate(product)
+    : totalRate(product);
 
   const showFilField =
     rateEntry && (rateEntry.role === "FIL" || rateEntry.role === "MANAGER");
   const showPolField =
     rateEntry && (rateEntry.role === "POL" || rateEntry.role === "MANAGER");
+  const showSystemFil = rateEntry ? rateEntry.role !== "POL" : true;
+  const showSystemPolPrp = rateEntry ? rateEntry.role !== "FIL" : true;
 
   const submitLabel =
     rateEntry?.submitState === "submitting"
@@ -274,8 +279,7 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
             {showPolField &&
             (rateEntry.polRatesEditable ||
               (rateEntry.polRate !== undefined &&
-                rateEntry.prpRate !== undefined &&
-                rateEntry.dhagaRate !== undefined)) ? (
+                rateEntry.prpRate !== undefined)) ? (
               <div
                 className={`product-card__entry-rates${
                   rateEntry.polRatesEditable
@@ -301,14 +305,6 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                       disabled={rateEntry.submitState === "submitting"}
                       onChange={rateEntry.onPrpRateChange}
                     />
-                    <CardRateInput
-                      label="DHAGA"
-                      value={rateEntry.dhagaRate}
-                      suggested={rateEntry.suggestedDhagaRate}
-                      tone="emerald"
-                      disabled={rateEntry.submitState === "submitting"}
-                      onChange={rateEntry.onDhagaRateChange}
-                    />
                   </>
                 ) : (
                   <>
@@ -321,11 +317,6 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                       label="PRP"
                       value={rateEntry.prpRate!}
                       tone="amber"
-                    />
-                    <EntryRatePill
-                      label="DHAGA"
-                      value={rateEntry.dhagaRate!}
-                      tone="emerald"
                     />
                   </>
                 )}
@@ -377,10 +368,15 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
             </span>
           </div>
           <div className="product-card__rates-grid">
-            <RateCell label="FIL" value={product.filRate} accent="violet" />
-            <RateCell label="POL" value={product.polRate} accent="sky" />
-            <RateCell label="PRP" value={product.prpRate} accent="amber" />
-            <RateCell label="DHAGA" value={product.dhagaRate} accent="emerald" />
+            {showSystemFil ? (
+              <RateCell label="FIL" value={product.filRate} accent="violet" />
+            ) : null}
+            {showSystemPolPrp ? (
+              <RateCell label="POL" value={product.polRate} accent="sky" />
+            ) : null}
+            {showSystemPolPrp ? (
+              <RateCell label="PRP" value={product.prpRate} accent="amber" />
+            ) : null}
           </div>
         </div>
       </div>

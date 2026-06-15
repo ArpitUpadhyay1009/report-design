@@ -1,6 +1,7 @@
 import ImageBox from "@/components/image-box/imageBox";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
+import type { Role } from "@/types/profile";
 import "./productRow.css";
 
 type Tone = "amber" | "violet" | "emerald" | "rose";
@@ -22,11 +23,17 @@ const inr = (n: number): string =>
 
 interface ProductRowProps {
   product: Product;
+  role: Role;
 }
 
-export default function ProductRow({ product }: ProductRowProps) {
+export default function ProductRow({ product, role }: ProductRowProps) {
   const tone = toneFor(product.custType);
-  const total = totalRate(product);
+  const total =
+    role === "POL"
+      ? (product.polRate ?? 0) + (product.prpRate ?? 0)
+      : role === "FIL"
+      ? product.filRate ?? 0
+      : totalRate(product);
 
   return (
     <tr className="product-row">
@@ -56,10 +63,15 @@ export default function ProductRow({ product }: ProductRowProps) {
       <td className="product-row__cell product-row__cell--center">{product.dep}</td>
       <td className="product-row__cell product-row__cell--center">{product.polCtg}</td>
       <td className="product-row__cell product-row__cell--center">{product.difficulty}</td>
-      <td className="product-row__cell product-row__cell--num">{inr(product.filRate)}</td>
-      <td className="product-row__cell product-row__cell--num">{inr(product.polRate)}</td>
-      <td className="product-row__cell product-row__cell--num">{inr(product.prpRate)}</td>
-      <td className="product-row__cell product-row__cell--num">{inr(product.dhagaRate)}</td>
+      {role !== "POL" ? (
+        <td className="product-row__cell product-row__cell--num">{inr(product.filRate)}</td>
+      ) : null}
+      {role !== "FIL" ? (
+        <td className="product-row__cell product-row__cell--num">{inr(product.polRate)}</td>
+      ) : null}
+      {role !== "FIL" ? (
+        <td className="product-row__cell product-row__cell--num">{inr(product.prpRate)}</td>
+      ) : null}
       <td className="product-row__cell product-row__cell--num product-row__cell--total">
         {inr(total)}
       </td>

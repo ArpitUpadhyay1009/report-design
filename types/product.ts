@@ -22,4 +22,4 @@ export interface Product {
 }
 
 export const totalRate = (p: Product): number =>
-  p.filRate + p.polRate + p.prpRate + p.dhagaRate;
+  p.filRate + p.polRate + p.prpRate;
