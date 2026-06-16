@@ -5,7 +5,7 @@ import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import type { Role } from "@/types/profile";
 import type { PolRate } from "@/services/api";
-import { isPolSpCode } from "@/utils/rateEntryHelpers";
+import { isPolSpCode, isFilSpCode } from "@/utils/rateEntryHelpers";
 import "./productCard.css";
 
 type Tone = "amber" | "rose" | "emerald" | "sky" | "violet";
@@ -61,6 +61,7 @@ export interface CardRateEntryProps {
   polCategoryCodes: string[];
   usePolDualDropdown: boolean;
   polRatesEditable: boolean;
+  filRatesEditable?: boolean;
   polRates?: PolRate[];
   difficulty?: string;
   polDropdownValue: string;
@@ -68,11 +69,13 @@ export interface CardRateEntryProps {
   filRate?: number;
   polRate?: number;
   prpRate?: number;
+  suggestedFilRate?: number;
   suggestedPolRate?: number;
   suggestedPrpRate?: number;
   onDifficultyChange: (code: string) => void;
   onPolOptionChange: (option: string) => void;
   onDmCtgChange: (dmCtg: string) => void;
+  onFilRateChange: (rate: number | undefined) => void;
   onPolRateChange: (rate: number | undefined) => void;
   onPrpRateChange: (rate: number | undefined) => void;
   onSubmit: () => void;
@@ -218,9 +221,14 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                     className="product-card__select"
                     value={rateEntry.difficulty ?? ""}
                     disabled={rateEntry.submitState === "submitting"}
-                    onChange={(e) =>
-                      rateEntry.onDifficultyChange(e.target.value)
-                    }
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      rateEntry.onDifficultyChange(code);
+                      // If user switches to a special FIL code, initialize to 0
+                      if (code && isFilSpCode(code)) {
+                        rateEntry.onFilRateChange(0);
+                      }
+                    }}
                   >
                     <option value="">Select difficulty…</option>
                     {rateEntry.difficultyOptions.map((code) => (
@@ -229,12 +237,32 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                       </option>
                     ))}
                   </select>
-                  {rateEntry.filRate !== undefined ? (
-                    <span className="product-card__entry-derived">
-                      FIL <strong>₹ {inr(rateEntry.filRate)}</strong>
-                    </span>
-                  ) : null}
                 </label>
+              ) : null}
+
+              {showFilField && rateEntry.difficulty && isFilSpCode(rateEntry.difficulty) ? (
+                <div className="product-card__entry-rates product-card__entry-rates--editable">
+                  {rateEntry.filRatesEditable ? (
+                    <CardRateInput
+                      label="FIL"
+                      value={rateEntry.filRate}
+                      suggested={rateEntry.suggestedFilRate ?? 0}
+                      tone="emerald"
+                      disabled={rateEntry.submitState === "submitting"}
+                      onChange={rateEntry.onFilRateChange}
+                    />
+                  ) : (
+                    <EntryRatePill
+                      label="FIL"
+                      value={rateEntry.filRate ?? 0}
+                      tone="emerald"
+                    />
+                  )}
+                </div>
+              ) : rateEntry.filRate !== undefined && rateEntry.filRate !== 0 ? (
+                <span className="product-card__entry-derived">
+                  FIL <strong>₹ {inr(rateEntry.filRate)}</strong>
+                </span>
               ) : null}
 
               {showPolField ? (

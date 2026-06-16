@@ -1163,6 +1163,8 @@ function SectionCells({
     const effectiveFilRate =
       entry.filRate ??
       (effectiveDifficulty ? getFilRate(effectiveDifficulty) : undefined);
+    const isFilSpCode = effectiveDifficulty?.endsWith("SP") ?? false;
+    const defaultFilRate = effectiveDifficulty ? getFilRate(effectiveDifficulty) : undefined;
 
     return (
       <>
@@ -1175,20 +1177,22 @@ function SectionCells({
               value={effectiveDifficulty}
               disabled={!editable}
               onSelect={(code) => {
-                const filRate =
-                  code === undefined ? undefined : getFilRate(code);
+                const filRate = code === undefined ? undefined : (code?.endsWith("SP") ? 0 : getFilRate(code));
                 onPatch({ difficulty: code, filRate });
               }}
             />
           )}
         </td>
-        <td className={`${tdClass} rate-entry__td--num`}>
-          {effectiveFilRate !== undefined ? (
-            inr(effectiveFilRate)
-          ) : (
-            <span className="rate-entry__placeholder">—</span>
-          )}
-        </td>
+        {editable && isFilSpCode ? (
+          <EditableRateCell
+            tdClass={tdClass}
+            value={entry.filRate}
+            suggested={0}
+            onChange={(rate) => onPatch({ filRate: rate })}
+          />
+        ) : (
+          <DerivedRateCell tdClass={tdClass} value={effectiveFilRate} />
+        )}
       </>
     );
   }

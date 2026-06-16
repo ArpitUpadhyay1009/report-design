@@ -229,6 +229,10 @@ export function isPolSpCode(polRates: PolRate[], code: string): boolean {
   return polRates.some((r) => r.polSp === code);
 }
 
+export function isFilSpCode(code: string): boolean {
+  return code.endsWith("SP");
+}
+
 export function patchFromPolSp(
   polRates: PolRate[],
   polSp: string,

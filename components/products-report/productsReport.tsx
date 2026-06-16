@@ -33,6 +33,7 @@ import {
   filRateForDesignDifficulty,
   filRateForDifficulty,
   isPolSpCode,
+  isFilSpCode,
   patchFromDmCtg,
   patchFromPolSp,
   polCategoryCodesFrom,
@@ -438,7 +439,7 @@ export default function ProductsReport({
     (product: Product, code: string) => {
       if (!editableRole || user.role === "POL") return;
       const role: RateRole = user.role === "MANAGER" ? "MANAGER" : "FIL";
-      const filRate =
+      const filRate = isFilSpCode(code) ? 0 : (
         user.role === "FIL"
           ? filRateForDesignDifficulty(
               difficultyRates ?? [],
@@ -449,7 +450,8 @@ export default function ProductsReport({
               difficultyRates ?? [],
               code,
               product.custType
-            );
+            )
+      );
       handleRateChange(product.id, role, {
         difficulty: code,
         filRate,
@@ -499,6 +501,14 @@ export default function ProductsReport({
     [editableRole, user.role, handleRateChange]
   );
 
+  const handleCardFilRateChange = useCallback(
+    (product: Product, rate: number | undefined) => {
+      if (!editableRole || (user.role !== "FIL" && user.role !== "MANAGER")) return;
+      const role: RateRole = user.role === "MANAGER" ? "MANAGER" : "FIL";
+      handleRateChange(product.id, role, { filRate: rate });
+    },
+    [editableRole, user.role, handleRateChange]
+  );
 
   const handleCardSubmit = useCallback(
     async (product: Product) => {
@@ -736,6 +746,11 @@ export default function ProductsReport({
       const suggestedPol = isCurrentlyPolSp ? 0 : lookupRates.polRate;
       const suggestedPrp = isCurrentlyPolSp ? 0 : lookupRates.prpRate;
 
+      // When a FIL special code (ending with SP) is selected, initialize rate to 0
+      const isCurrentlyFilSp = difficulty && isFilSpCode(difficulty);
+      const effectiveFilRate = isCurrentlyFilSp ? (sectionEntry.filRate ?? 0) : filRate;
+      const suggestedFilRate = isCurrentlyFilSp ? 0 : filRate;
+
       return {
         role: user.role,
         difficultyOptions: filDifficultyOptions,
@@ -745,12 +760,17 @@ export default function ProductsReport({
         polRatesEditable:
           user.role === "POL" &&
           sectionEntry.polSp !== undefined,
+        filRatesEditable:
+          (user.role === "FIL" || user.role === "MANAGER") &&
+          difficulty !== undefined &&
+          isFilSpCode(difficulty),
         difficulty,
         polDropdownValue,
         dmCtg,
-        filRate,
+        filRate: effectiveFilRate,
         polRate: effectivePolRate,
         prpRate: effectivePrpRate,
+        suggestedFilRate,
         suggestedPolRate: suggestedPol,
         suggestedPrpRate: suggestedPrp,
         onDifficultyChange: (code) =>
@@ -758,6 +778,7 @@ export default function ProductsReport({
         onPolOptionChange: (option) =>
           handleCardPolOptionChange(product, option),
         onDmCtgChange: (code) => handleCardDmCtgChange(product, code),
+        onFilRateChange: (rate) => handleCardFilRateChange(product, rate),
         onPolRateChange: (rate) => handleCardPolRateChange(product, rate),
         onPrpRateChange: (rate) => handleCardPrpRateChange(product, rate),
         onSubmit: () => handleCardSubmit(product),
@@ -783,6 +804,7 @@ export default function ProductsReport({
       handleCardDifficultyChange,
       handleCardPolOptionChange,
       handleCardDmCtgChange,
+      handleCardFilRateChange,
       handleCardPolRateChange,
       handleCardPrpRateChange,
       handleCardSubmit,
