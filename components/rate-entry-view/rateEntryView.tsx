@@ -1213,6 +1213,9 @@ function SectionCells({
         );
         return;
       }
+      // Build the patch to apply for this selection. If the special
+      // "POL_CTG" option is chosen, ensure editable POL/PRP inputs start at 0.
+      let patch: Partial<RateEntry>;
       if (
         ratesEditable &&
         usePolDualDropdown &&
@@ -1220,23 +1223,25 @@ function SectionCells({
         resolveDmCtgPatch &&
         polRatesForLookup
       ) {
-        if (isPolSpCode(polRatesForLookup, code)) {
-          onPatch(resolvePolSpPatch(code));
-        } else {
-          onPatch(resolveDmCtgPatch(code));
-        }
-        return;
-      }
-      if (ratesEditable && getCategoryRates && code) {
+        patch = isPolSpCode(polRatesForLookup, code)
+          ? resolvePolSpPatch(code)
+          : resolveDmCtgPatch(code);
+      } else if (ratesEditable && getCategoryRates && code) {
         const rates = getCategoryRates(code);
-        onPatch({
+        patch = {
           dmCtg: code,
           polRate: rates.polRate,
           prpRate: rates.prpRate,
-        });
-        return;
+        };
+      } else {
+        patch = usePolDualDropdown ? { polSp: code } : { dmCtg: code };
       }
-      onPatch(usePolDualDropdown ? { polSp: code } : { dmCtg: code });
+
+      if (code && isPolSpCode(polRatesForLookup ?? [], code)) {
+        patch = { ...patch, polRate: 0, prpRate: 0 };
+      }
+
+      onPatch(patch);
     };
 
     return (
@@ -1253,7 +1258,7 @@ function SectionCells({
             />
           )}
         </td>
-        {ratesEditable ? (
+        {ratesEditable && dropdownValue && isPolSpCode(polRatesForLookup ?? [], dropdownValue) ? (
           <>
             <EditableRateCell
               tdClass={tdClass}
@@ -1298,6 +1303,7 @@ function SectionCells({
       );
       return;
     }
+    let patch: Partial<RateEntry>;
     if (
       editable &&
       usePolDualDropdown &&
@@ -1305,29 +1311,33 @@ function SectionCells({
       resolveDmCtgPatch &&
       polRatesForLookup
     ) {
-      if (isPolSpCode(polRatesForLookup, code)) {
-        onPatch(resolvePolSpPatch(code));
-      } else {
-        onPatch(resolveDmCtgPatch(code));
-      }
-      return;
-    }
-    if (editable && getCategoryRates && code) {
+      patch = isPolSpCode(polRatesForLookup, code)
+        ? resolvePolSpPatch(code)
+        : resolveDmCtgPatch(code);
+    } else if (editable && getCategoryRates && code) {
       const rates = getCategoryRates(code);
-      onPatch({
+      patch = {
         dmCtg: code,
         polRate: rates.polRate,
         prpRate: rates.prpRate,
-      });
-      return;
+      };
+    } else {
+      patch = usePolDualDropdown ? { polSp: code } : { dmCtg: code };
     }
-    onPatch(usePolDualDropdown ? { polSp: code } : { dmCtg: code });
+
+if (code && isPolSpCode(polRatesForLookup ?? [], code)) {
+      patch = { ...patch, polRate: 0, prpRate: 0 };
+    }
+
+    onPatch(patch);
   };
 
   const effectiveDifficulty = entry.difficulty ?? defaultDifficulty;
   const effectiveFilRate =
     entry.filRate ??
     (effectiveDifficulty ? getFilRate(effectiveDifficulty) : undefined);
+
+  const isCurrentlyPolSp = dropdownValue && isPolSpCode(polRatesForLookup ?? [], dropdownValue);
 
   return (
     <>
@@ -1357,8 +1367,27 @@ function SectionCells({
           onSelect={handleManagerDmCtgSelect}
         />
       </td>
-      <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
-      <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
+      {editable && isCurrentlyPolSp ? (
+        <>
+          <EditableRateCell
+            tdClass={tdClass}
+            value={entry.polRate}
+            suggested={categoryRates.polRate}
+            onChange={(rate) => onPatch({ polRate: rate })}
+          />
+          <EditableRateCell
+            tdClass={tdClass}
+            value={entry.prpRate}
+            suggested={categoryRates.prpRate}
+            onChange={(rate) => onPatch({ prpRate: rate })}
+          />
+        </>
+      ) : (
+        <>
+          <DerivedRateCell tdClass={tdClass} value={categoryRates.polRate} />
+          <DerivedRateCell tdClass={tdClass} value={categoryRates.prpRate} />
+        </>
+      )}
     </>
   );
 }
@@ -1398,7 +1427,7 @@ function EditableRateCell({
   onChange,
 }: EditableRateCellProps) {
   const display =
-    value !== undefined ? String(value) : suggested !== undefined ? String(suggested) : "";
+    value !== undefined ? String(value) : suggested !== undefined ? String(suggested) : "0";
 
   return (
     <td className={`${tdClass} rate-entry__td--num`}>

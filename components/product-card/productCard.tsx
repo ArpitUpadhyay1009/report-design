@@ -4,6 +4,8 @@ import ImageBox from "@/components/image-box/imageBox";
 import type { Product } from "@/types/product";
 import { totalRate } from "@/types/product";
 import type { Role } from "@/types/profile";
+import type { PolRate } from "@/services/api";
+import { isPolSpCode } from "@/utils/rateEntryHelpers";
 import "./productCard.css";
 
 type Tone = "amber" | "rose" | "emerald" | "sky" | "violet";
@@ -59,6 +61,7 @@ export interface CardRateEntryProps {
   polCategoryCodes: string[];
   usePolDualDropdown: boolean;
   polRatesEditable: boolean;
+  polRates?: PolRate[];
   difficulty?: string;
   polDropdownValue: string;
   dmCtg: string;
@@ -246,9 +249,20 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                     }
                     disabled={rateEntry.submitState === "submitting"}
                     onChange={(e) =>
-                      rateEntry.usePolDualDropdown
-                        ? rateEntry.onPolOptionChange(e.target.value)
-                        : rateEntry.onDmCtgChange(e.target.value)
+                      {
+                        const val = e.target.value;
+                        if (rateEntry.usePolDualDropdown) {
+                          rateEntry.onPolOptionChange(val);
+                        } else {
+                          rateEntry.onDmCtgChange(val);
+                        }
+                        // If user switches to the special POL_SP option,
+                        // initialize editable POL/PRP inputs to 0.
+                        if (val === "POL_SP") {
+                          rateEntry.onPolRateChange(0);
+                          rateEntry.onPrpRateChange(0);
+                        }
+                      }
                     }
                   >
                     <option value="">Select category…</option>
@@ -282,12 +296,18 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                 rateEntry.prpRate !== undefined)) ? (
               <div
                 className={`product-card__entry-rates${
-                  rateEntry.polRatesEditable
+                  rateEntry.polRatesEditable &&
+                  (rateEntry.usePolDualDropdown
+                    ? rateEntry.polDropdownValue && isPolSpCode(rateEntry.polRates ?? [], rateEntry.polDropdownValue)
+                    : rateEntry.dmCtg && isPolSpCode(rateEntry.polRates ?? [], rateEntry.dmCtg))
                     ? " product-card__entry-rates--editable"
                     : ""
                 }`}
               >
-                {rateEntry.polRatesEditable ? (
+                {rateEntry.polRatesEditable &&
+                (rateEntry.usePolDualDropdown
+                  ? rateEntry.polDropdownValue && isPolSpCode(rateEntry.polRates ?? [], rateEntry.polDropdownValue)
+                  : rateEntry.dmCtg && isPolSpCode(rateEntry.polRates ?? [], rateEntry.dmCtg)) ? (
                   <>
                     <CardRateInput
                       label="POL"
@@ -460,7 +480,7 @@ function CardRateInput({
       ? String(value)
       : suggested !== undefined
       ? String(suggested)
-      : "";
+      : "0";
 
   return (
     <label
