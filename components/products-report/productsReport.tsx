@@ -461,8 +461,9 @@ export default function ProductsReport({
   const handleCardPolOptionChange = useCallback(
     (product: Product, option: string) => {
       if (!editableRole || user.role !== "POL") return;
-      const patch = isPolSpCode(polRates ?? [], option)
-        ? patchFromPolSp(polRates ?? [], option, product.custType)
+      const isPolSp = isPolSpCode(polRates ?? [], option);
+      const patch = isPolSp
+        ? { ...patchFromPolSp(polRates ?? [], option, product.custType), polRate: 0, prpRate: 0 }
         : patchFromDmCtg(polRates ?? [], option, product.custType);
       handleRateChange(product.id, "POL", patch);
     },
@@ -728,6 +729,13 @@ export default function ProductsReport({
               )
           : undefined);
 
+      // When POL_SP is selected, initialize rates to 0 instead of using lookupRates
+      const isCurrentlyPolSp = polDropdownValue && isPolSpCode(polRates ?? [], polDropdownValue);
+      const effectivePolRate = isCurrentlyPolSp ? (sectionEntry.polRate ?? 0) : (sectionEntry.polRate ?? lookupRates.polRate);
+      const effectivePrpRate = isCurrentlyPolSp ? (sectionEntry.prpRate ?? 0) : (sectionEntry.prpRate ?? lookupRates.prpRate);
+      const suggestedPol = isCurrentlyPolSp ? 0 : lookupRates.polRate;
+      const suggestedPrp = isCurrentlyPolSp ? 0 : lookupRates.prpRate;
+
       return {
         role: user.role,
         difficultyOptions: filDifficultyOptions,
@@ -741,10 +749,10 @@ export default function ProductsReport({
         polDropdownValue,
         dmCtg,
         filRate,
-        polRate: sectionEntry.polRate ?? lookupRates.polRate,
-        prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
-        suggestedPolRate: lookupRates.polRate,
-        suggestedPrpRate: lookupRates.prpRate,
+        polRate: effectivePolRate,
+        prpRate: effectivePrpRate,
+        suggestedPolRate: suggestedPol,
+        suggestedPrpRate: suggestedPrp,
         onDifficultyChange: (code) =>
           handleCardDifficultyChange(product, code),
         onPolOptionChange: (option) =>
