@@ -756,6 +756,7 @@ export default function ProductsReport({
         canSubmit: isCardProductValid(product),
         submitState: cardSubmitStates[product.id] ?? "idle",
         submitMessage: cardSubmitMessages[product.id],
+        polRates: polRates ?? [],
       };
     },
     [
