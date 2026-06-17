@@ -9,10 +9,10 @@ interface AdminPanelProps {
   onLogout: () => void;
 }
 
-type AdminTab = "dashboard" | "users" | "reports" | "settings";
+type AdminTab = "all-designs" | "fil-entries" | "pol-entries" | "manager-entries";
 
 export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AdminTab>("all-designs");
 
   return (
     <div className="admin-panel">
@@ -44,82 +44,78 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
         <aside className="admin-sidebar">
           <nav className="admin-nav">
             <button
-              className={`admin-nav-item ${
-                activeTab === "dashboard" ? "admin-nav-item--active" : ""
-              }`}
-              onClick={() => setActiveTab("dashboard")}
+              className={`admin-nav-item ${activeTab === "all-designs" ? "admin-nav-item--active" : ""
+                }`}
+              onClick={() => setActiveTab("all-designs")}
             >
-              <span className="admin-nav-icon">📊</span>
-              Dashboard
+              <span className="admin-nav-icon">🎨</span>
+              All designs
             </button>
             <button
-              className={`admin-nav-item ${
-                activeTab === "users" ? "admin-nav-item--active" : ""
-              }`}
-              onClick={() => setActiveTab("users")}
+              className={`admin-nav-item ${activeTab === "fil-entries" ? "admin-nav-item--active" : ""
+                }`}
+              onClick={() => setActiveTab("fil-entries")}
             >
-              <span className="admin-nav-icon">👥</span>
-              Users
+              <span className="admin-nav-icon">�</span>
+              FIL entries
             </button>
             <button
-              className={`admin-nav-item ${
-                activeTab === "reports" ? "admin-nav-item--active" : ""
-              }`}
-              onClick={() => setActiveTab("reports")}
+              className={`admin-nav-item ${activeTab === "pol-entries" ? "admin-nav-item--active" : ""
+                }`}
+              onClick={() => setActiveTab("pol-entries")}
             >
-              <span className="admin-nav-icon">📋</span>
-              Reports
+              <span className="admin-nav-icon">�</span>
+              POL entries
             </button>
             <button
-              className={`admin-nav-item ${
-                activeTab === "settings" ? "admin-nav-item--active" : ""
-              }`}
-              onClick={() => setActiveTab("settings")}
+              className={`admin-nav-item ${activeTab === "manager-entries" ? "admin-nav-item--active" : ""
+                }`}
+              onClick={() => setActiveTab("manager-entries")}
             >
-              <span className="admin-nav-icon">⚙️</span>
-              Settings
+              <span className="admin-nav-icon">✅</span>
+              Manager entries
             </button>
           </nav>
         </aside>
 
         {/* Main Content Area */}
         <main className="admin-content">
-          {/* Dashboard Tab */}
-          {activeTab === "dashboard" && (
+          {/* All designs Tab */}
+          {activeTab === "all-designs" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">Dashboard Overview</h2>
+              <h2 className="admin-section-title">All designs</h2>
               <div className="admin-placeholder">
-                <p>Dashboard content will be designed here</p>
+                <p>View and manage all designs across the system</p>
               </div>
             </section>
           )}
 
-          {/* Users Tab */}
-          {activeTab === "users" && (
+          {/* FIL entries Tab */}
+          {activeTab === "fil-entries" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">User Management</h2>
+              <h2 className="admin-section-title">FIL entries</h2>
               <div className="admin-placeholder">
-                <p>User management interface will be designed here</p>
+                <p>Review and manage FIL rate entries</p>
               </div>
             </section>
           )}
 
-          {/* Reports Tab */}
-          {activeTab === "reports" && (
+          {/* POL entries Tab */}
+          {activeTab === "pol-entries" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">Reports & Analytics</h2>
+              <h2 className="admin-section-title">POL entries</h2>
               <div className="admin-placeholder">
-                <p>Reports and analytics will be designed here</p>
+                <p>Review and manage POL rate entries</p>
               </div>
             </section>
           )}
 
-          {/* Settings Tab */}
-          {activeTab === "settings" && (
+          {/* Manager entries Tab */}
+          {activeTab === "manager-entries" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">System Settings</h2>
+              <h2 className="admin-section-title">Manager entries</h2>
               <div className="admin-placeholder">
-                <p>System settings will be designed here</p>
+                <p>Review and manage manager-approved entries</p>
               </div>
             </section>
           )}

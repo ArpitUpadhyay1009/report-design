@@ -206,8 +206,8 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  // Route to admin panel for SUPER_MANAGER
-  if (user.role === "SUPER_MANAGER") {
+  // Route to admin panel for EmpCode FS10493
+  if (user.empCode.trim().toUpperCase() === "FS10493") {
     return <AdminPanel user={user} onLogout={logout} />;
   }
 
