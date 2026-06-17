@@ -20,4 +20,11 @@ export const profiles = [
     userId: "3",
     password: "123",
   },
+  {
+    name: "Admin User",
+    email: "admin@example.com",
+    role: "SUPER_MANAGER",
+    userId: "999",
+    password: "123",
+  },
 ];

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/header/header";
 import LoginForm from "@/components/login-form/loginForm";
 import ProductsReport from "@/components/products-report/productsReport";
+import AdminPanel from "@/components/admin-panel/adminPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchCompletedFilDesignIds,
@@ -203,6 +204,11 @@ export default function Home() {
 
   if (!user) {
     return <LoginForm />;
+  }
+
+  // Route to admin panel for SUPER_MANAGER
+  if (user.role === "SUPER_MANAGER") {
+    return <AdminPanel user={user} onLogout={logout} />;
   }
 
   return (

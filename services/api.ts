@@ -545,15 +545,15 @@ export async function fetchFilledRates(): Promise<FilledRate[]> {
       const filRate = parseNullableRate(row?.fil_rate);
       const polRate = parseNullableRate(row?.pol_rate);
       const prpRate = parseNullableRate(row?.prp_rate);
-      const dhagaRate = parseNullableRate(row?.dhaga_rate);
+      // dhagaRate can be null in the API response; default to 0 when null
+      const dhagaRate = parseNullableRate(row?.dhaga_rate) ?? 0;
       const dmCtg = (row?.dm_ctg ?? row?.DmCtg ?? "").trim() || undefined;
       if (
         !designId ||
         !difficulty ||
         filRate === null ||
         polRate === null ||
-        prpRate === null ||
-        dhagaRate === null
+        prpRate === null
       ) {
         return null;
       }

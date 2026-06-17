@@ -1,4 +1,4 @@
-export type Role = "POL" | "FIL" | "MANAGER";
+export type Role = "POL" | "FIL" | "MANAGER" | "SUPER_MANAGER";
 
 export interface Profile {
   // The unique employee id we send to the rate-submission APIs as `user_id`.
