@@ -137,10 +137,10 @@ export default function ProductsReport({
     user.role === "FIL"
       ? "FIL"
       : user.role === "POL"
-      ? "POL"
-      : user.role === "MANAGER"
-      ? "MANAGER"
-      : null;
+        ? "POL"
+        : user.role === "MANAGER"
+          ? "MANAGER"
+          : null;
 
   const products = useMemo<Product[]>(
     () => (load.status === "success" ? load.products : []),
@@ -346,10 +346,10 @@ export default function ProductsReport({
           e?.filRate ??
           (difficulty
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                p.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              p.custType
+            )
             : undefined);
         return (
           !!difficulty &&
@@ -401,10 +401,10 @@ export default function ProductsReport({
           sectionEntry.filRate ??
           (difficulty
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                p.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              p.custType
+            )
             : filled?.filRate);
         if (
           typeof difficulty !== "string" ||
@@ -442,15 +442,15 @@ export default function ProductsReport({
       const filRate = isFilSpCode(code) ? 0 : (
         user.role === "FIL"
           ? filRateForDesignDifficulty(
-              difficultyRates ?? [],
-              code,
-              product.custType
-            )
+            difficultyRates ?? [],
+            code,
+            product.custType
+          )
           : filRateForDifficulty(
-              difficultyRates ?? [],
-              code,
-              product.custType
-            )
+            difficultyRates ?? [],
+            code,
+            product.custType
+          )
       );
       handleRateChange(product.id, role, {
         difficulty: code,
@@ -542,10 +542,10 @@ export default function ProductsReport({
             sectionEntry.filRate ??
             (difficulty
               ? filRateForDesignDifficulty(
-                  difficultyRates ?? [],
-                  difficulty,
-                  product.custType
-                )
+                difficultyRates ?? [],
+                difficulty,
+                product.custType
+              )
               : undefined);
           const result = await submitFilRate({
             user_id: user.userId,
@@ -620,10 +620,10 @@ export default function ProductsReport({
             sectionEntry.filRate ??
             (difficulty
               ? filRateForDesignDifficulty(
-                  difficultyRates ?? [],
-                  difficulty,
-                  product.custType
-                )
+                difficultyRates ?? [],
+                difficulty,
+                product.custType
+              )
               : filled?.filRate);
           const effectiveDmCtg =
             sectionEntry.dmCtg ?? resolvedDmCtg ?? filled?.dmCtg ?? "";
@@ -695,16 +695,16 @@ export default function ProductsReport({
       const filDifficultyOptions =
         user.role === "FIL" || user.role === "MANAGER"
           ? designDifficultiesForDmCtg(
-              designDifficultiesByDmCtg,
-              resolvedDmCtg
-            )
+            designDifficultiesByDmCtg,
+            resolvedDmCtg
+          )
           : apiDifficultyCodes;
       const defaultFilDifficulty =
         user.role === "FIL" || user.role === "MANAGER"
           ? resolveDefaultDesignDifficulty(
-              filDifficultyOptions,
-              filled?.difficulty ?? product.difficulty
-            )
+            filDifficultyOptions,
+            filled?.difficulty ?? product.difficulty
+          )
           : undefined;
       const difficulty =
         sectionEntry.difficulty ??
@@ -728,15 +728,15 @@ export default function ProductsReport({
         (difficulty
           ? user.role === "FIL" || user.role === "MANAGER"
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                product.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              product.custType
+            )
             : filRateForDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                product.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              product.custType
+            )
           : undefined);
 
       // When POL_SP is selected, initialize rates to 0 instead of using lookupRates
@@ -837,8 +837,8 @@ export default function ProductsReport({
           view === "completed"
             ? "Completed designs"
             : user.role === "MANAGER"
-            ? "Ready for review"
-            : "Pending designs",
+              ? "Ready for review"
+              : "Pending designs",
         hint:
           view === "completed"
             ? "Visible / completed total"
@@ -857,8 +857,8 @@ export default function ProductsReport({
       hint: query
         ? "Visible / filtered total"
         : isPendingGrid
-        ? "Visible / pending total"
-        : "Visible / total in list",
+          ? "Visible / pending total"
+          : "Visible / total in list",
     };
   }, [
     view,
@@ -873,98 +873,98 @@ export default function ProductsReport({
   return (
     <section className="products-report">
       {hasProducts ? (
-      <div className="products-report__stats">
-        <StatCard
-          label="Total designs"
-          value={String(stats.count)}
-          hint="In current report"
-          accent="violet"
-          icon={
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4M3 17l9 4 9-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Avg total rate"
-          value={inr(stats.avg)}
-          hint="FIL + POL + PRP"
-          accent="amber"
-          icon={
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M4 19h16M6 16l3-5 3 3 4-7 2 4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Highest total"
-          value={inr(stats.max)}
-          hint="Single design"
-          accent="emerald"
-          icon={
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M3 17l6-6 4 4 7-8M14 7h7v7"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Managers"
-          value={String(stats.managers)}
-          hint="Unique"
-          accent="sky"
-          icon={
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21a8 8 0 0116 0"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label={listSummary.label}
-          value={`${listSummary.shown} / ${listSummary.total}`}
-          hint={listSummary.hint}
-          accent="violet"
-          icon={
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M4 6h16M4 12h16M4 18h10"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-        />
-      </div>
+        <div className="products-report__stats">
+          <StatCard
+            label="Total designs"
+            value={String(stats.count)}
+            hint="In current report"
+            accent="violet"
+            icon={
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4M3 17l9 4 9-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Avg total rate"
+            value={inr(stats.avg)}
+            hint="FIL + POL + PRP"
+            accent="amber"
+            icon={
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M4 19h16M6 16l3-5 3 3 4-7 2 4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Highest total"
+            value={inr(stats.max)}
+            hint="Single design"
+            accent="emerald"
+            icon={
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M3 17l6-6 4 4 7-8M14 7h7v7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Managers"
+            value={String(stats.managers)}
+            hint="Unique"
+            accent="sky"
+            icon={
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21a8 8 0 0116 0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+          />
+          <StatCard
+            label={listSummary.label}
+            value={`${listSummary.shown} / ${listSummary.total}`}
+            hint={listSummary.hint}
+            accent="violet"
+            icon={
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M4 6h16M4 12h16M4 18h10"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+          />
+        </div>
       ) : null}
 
       <div className="products-report__toolbar">
@@ -1034,9 +1034,8 @@ export default function ProductsReport({
             type="button"
             role="tab"
             aria-selected={view === "grid"}
-            className={`products-report__view${
-              view === "grid" ? " products-report__view--active" : ""
-            }`}
+            className={`products-report__view${view === "grid" ? " products-report__view--active" : ""
+              }`}
             onClick={handleOpenGrid}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -1051,9 +1050,8 @@ export default function ProductsReport({
             type="button"
             role="tab"
             aria-selected={view === "table"}
-            className={`products-report__view${
-              view === "table" ? " products-report__view--active" : ""
-            }`}
+            className={`products-report__view${view === "table" ? " products-report__view--active" : ""
+              }`}
             onClick={() => setView("table")}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -1071,9 +1069,8 @@ export default function ProductsReport({
             type="button"
             role="tab"
             aria-selected={view === "entry"}
-            className={`products-report__view${
-              view === "entry" ? " products-report__view--active" : ""
-            }`}
+            className={`products-report__view${view === "entry" ? " products-report__view--active" : ""
+              }`}
             onClick={handleOpenEntry}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -1093,9 +1090,8 @@ export default function ProductsReport({
               type="button"
               role="tab"
               aria-selected={view === "completed"}
-              className={`products-report__view${
-                view === "completed" ? " products-report__view--active" : ""
-              }`}
+              className={`products-report__view${view === "completed" ? " products-report__view--active" : ""
+                }`}
               onClick={handleOpenCompleted}
             >
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -1226,24 +1222,24 @@ export default function ProductsReport({
                 )}
               </div>
             ) : (
-            <>
-              <div className="products-report__grid">
-                {visibleProducts.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    rateEntry={buildCardRateEntry(p)}
+              <>
+                <div className="products-report__grid">
+                  {visibleProducts.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      rateEntry={buildCardRateEntry(p)}
+                    />
+                  ))}
+                </div>
+                {hasMore ? (
+                  <ShowMoreBar
+                    remaining={remainingCount}
+                    pageSize={PAGE_SIZE}
+                    onShowMore={handleShowMore}
                   />
-                ))}
-              </div>
-              {hasMore ? (
-                <ShowMoreBar
-                  remaining={remainingCount}
-                  pageSize={PAGE_SIZE}
-                  onShowMore={handleShowMore}
-                />
-              ) : null}
-            </>
+                ) : null}
+              </>
             )
           ) : (
             <>
@@ -1264,8 +1260,8 @@ export default function ProductsReport({
                           user.role === "POL"
                             ? 3
                             : user.role === "FIL"
-                            ? 2
-                            : 5
+                              ? 2
+                              : 5
                         }
                         className="products-report__th-group products-report__th-group--accent"
                       >
@@ -1277,7 +1273,7 @@ export default function ProductsReport({
                     </tr>
                     <tr>
                       <th>Diff</th>
-                      {user.role !== "POL" ? <th>FIL</th> : null}
+                      {user.role !== "POL" ? <th>{user.role === "FIL" ? "FIL rate" : "FIL"}</th> : null}
                       {user.role !== "FIL" ? <th>POL</th> : null}
                       {user.role !== "FIL" ? <th>PRP</th> : null}
                     </tr>
