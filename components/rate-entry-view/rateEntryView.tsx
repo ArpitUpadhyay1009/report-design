@@ -210,16 +210,16 @@ export default function RateEntryView({
     user.role === "POL"
       ? "POL"
       : user.role === "FIL"
-      ? "FIL"
-      : user.role === "MANAGER"
-      ? "MANAGER"
-      : null;
+        ? "FIL"
+        : user.role === "MANAGER"
+          ? "MANAGER"
+          : null;
 
   const localDifficultyCodes = Object.keys(difficulties);
   const apiDifficultyCodes =
     (user.role === "FIL" || user.role === "MANAGER") &&
-    difficultyOptions &&
-    difficultyOptions.length > 0
+      difficultyOptions &&
+      difficultyOptions.length > 0
       ? difficultyOptions
       : localDifficultyCodes;
 
@@ -314,10 +314,10 @@ export default function RateEntryView({
           e?.filRate ??
           (difficulty
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                p.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              p.custType
+            )
             : undefined);
         return (
           !!difficulty &&
@@ -363,10 +363,10 @@ export default function RateEntryView({
           sectionEntry.filRate ??
           (difficulty
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                p.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              p.custType
+            )
             : filled?.filRate);
         if (
           typeof difficulty !== "string" ||
@@ -464,10 +464,10 @@ export default function RateEntryView({
           e.filRate ??
           (difficulty
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                p.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              p.custType
+            )
             : undefined);
         const payload = {
           user_id: user.userId,
@@ -514,10 +514,10 @@ export default function RateEntryView({
           sectionEntry.filRate ??
           (difficulty
             ? filRateForDesignDifficulty(
-                difficultyRates ?? [],
-                difficulty,
-                p.custType
-              )
+              difficultyRates ?? [],
+              difficulty,
+              p.custType
+            )
             : filled?.filRate);
         const effectiveDmCtg =
           sectionEntry.dmCtg ?? resolvedDmCtg ?? filled?.dmCtg ?? "";
@@ -669,11 +669,11 @@ export default function RateEntryView({
               ? user.role === "FIL"
                 ? "Designs where FIL rates have already been submitted."
                 : user.role === "POL"
-                ? "Designs where POL rates have already been submitted."
-                : "Previously submitted entries."
+                  ? "Designs where POL rates have already been submitted."
+                  : "Previously submitted entries."
               : user.role === "MANAGER"
-              ? "Review what FIL and POL filled, enter your final approved rates, then check the rows to submit."
-              : "Pick from the dropdowns below — rates fill in automatically. Check the rows you want to submit."}
+                ? "Review what FIL and POL filled, enter your final approved rates, then check the rows to submit."
+                : "Pick from the dropdowns below — rates fill in automatically. Check the rows you want to submit."}
           </p>
         </div>
         <div className="rate-entry__legend">
@@ -743,12 +743,12 @@ export default function RateEntryView({
                   {mode === "completed"
                     ? "No completed designs in the current list. Widen the date range or check back after submissions."
                     : user.role === "MANAGER"
-                    ? filledRates?.length
-                      ? "Filled rates were loaded but none could be displayed. Try refreshing."
-                      : "No designs are ready for manager review yet. FIL and POL must both be completed."
-                    : user.role === "FIL" || user.role === "POL"
-                    ? "No pending designs — matching rows are in the Completed tab."
-                    : "No designs to show."}
+                      ? filledRates?.length
+                        ? "Filled rates were loaded but none could be displayed. Try refreshing."
+                        : "No designs are ready for manager review yet. FIL and POL must both be completed."
+                      : user.role === "FIL" || user.role === "POL"
+                        ? "No pending designs — matching rows are in the Completed tab."
+                        : "No designs to show."}
                 </td>
               </tr>
             ) : null}
@@ -854,7 +854,7 @@ export default function RateEntryView({
                       s === "FIL"
                         ? resolvedDmCtg
                         : sectionEntry.dmCtg ??
-                          (isEditable ? resolvedDmCtg : filled?.dmCtg ?? "");
+                        (isEditable ? resolvedDmCtg : filled?.dmCtg ?? "");
 
                     const polDropdownOptions = polDropdownOptionsForDmCtg(
                       polRates ?? [],
@@ -873,31 +873,31 @@ export default function RateEntryView({
 
                     const polSectionRates: CategoryRates =
                       mode === "completed" &&
-                      isEditable &&
-                      user.role === "POL" &&
-                      s === "POL"
+                        isEditable &&
+                        user.role === "POL" &&
+                        s === "POL"
                         ? {
-                            polRate: p.polRate,
-                            prpRate: p.prpRate,
-                          }
+                          polRate: p.polRate,
+                          prpRate: p.prpRate,
+                        }
                         : s === "POL" && isEditable && user.role === "POL"
-                        ? {
+                          ? {
                             polRate: sectionEntry.polRate ?? lookupRates.polRate,
                             prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
                           }
-                        : s === "POL" && !isEditable
-                        ? {
-                            polRate: sectionEntry.polRate,
-                            prpRate: sectionEntry.prpRate,
-                          }
-                        : s === "MANAGER" &&
-                          isEditable &&
-                          user.role === "MANAGER"
-                        ? {
-                            polRate: sectionEntry.polRate ?? lookupRates.polRate,
-                            prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
-                          }
-                        : lookupRates;
+                          : s === "POL" && !isEditable
+                            ? {
+                              polRate: sectionEntry.polRate,
+                              prpRate: sectionEntry.prpRate,
+                            }
+                            : s === "MANAGER" &&
+                              isEditable &&
+                              user.role === "MANAGER"
+                              ? {
+                                polRate: sectionEntry.polRate ?? lookupRates.polRate,
+                                prpRate: sectionEntry.prpRate ?? lookupRates.prpRate,
+                              }
+                              : lookupRates;
 
                     const useDesignWiseDifficulty =
                       ((user.role === "FIL" && s === "FIL") ||
@@ -908,18 +908,18 @@ export default function RateEntryView({
 
                     const filDifficultyOptions = useDesignWiseDifficulty
                       ? designDifficultiesForDmCtg(
-                          designDifficultiesByDmCtg,
-                          resolvedDmCtg
-                        )
+                        designDifficultiesByDmCtg,
+                        resolvedDmCtg
+                      )
                       : apiDifficultyCodes;
 
                     const defaultFilDifficulty = useDesignWiseDifficulty
                       ? resolveDefaultDesignDifficulty(
-                          filDifficultyOptions,
-                          sectionEntry.difficulty ??
-                            filled?.difficulty ??
-                            p.difficulty
-                        )
+                        filDifficultyOptions,
+                        sectionEntry.difficulty ??
+                        filled?.difficulty ??
+                        p.difficulty
+                      )
                       : undefined;
 
                     const usePolDualDropdown =
@@ -993,9 +993,9 @@ export default function RateEntryView({
       ) : null}
 
       {showCheckboxes &&
-      (user.role === "FIL" ||
-        user.role === "POL" ||
-        user.role === "MANAGER") ? (
+        (user.role === "FIL" ||
+          user.role === "POL" ||
+          user.role === "MANAGER") ? (
         <div className="rate-entry__submit-bar">
           <div className="rate-entry__submit-info">
             {submittableProducts.length === 0 ? (
@@ -1003,8 +1003,8 @@ export default function RateEntryView({
                 {selectedCount === 0
                   ? "Check at least one row to submit."
                   : user.role === "POL"
-                  ? "Selected rows need valid POL and PRP rates before submitting."
-                  : "Selected rows need a difficulty before submitting."}
+                    ? "Selected rows need valid POL and PRP rates before submitting."
+                    : "Selected rows need a difficulty before submitting."}
               </span>
             ) : (
               <span className="rate-entry__submit-hint">
@@ -1015,11 +1015,10 @@ export default function RateEntryView({
             )}
             {submitSummary ? (
               <span
-                className={`rate-entry__submit-summary${
-                  submitSummary.failed > 0
+                className={`rate-entry__submit-summary${submitSummary.failed > 0
                     ? " rate-entry__submit-summary--mixed"
                     : " rate-entry__submit-summary--ok"
-                }`}
+                  }`}
               >
                 Saved {submitSummary.done} of {submitSummary.total}
                 {submitSummary.failed > 0
@@ -1049,10 +1048,10 @@ export default function RateEntryView({
               {submitting
                 ? "Submitting…"
                 : user.role === "FIL"
-                ? "Submit FIL rates"
-                : user.role === "POL"
-                ? "Submit POL rates"
-                : "Submit Manager approvals"}
+                  ? "Submit FIL rates"
+                  : user.role === "POL"
+                    ? "Submit POL rates"
+                    : "Submit Manager approvals"}
             </button>
           </div>
         </div>
@@ -1071,8 +1070,8 @@ function RowStatusBadge({ status, message }: RowStatusBadgeProps) {
     status === "submitting"
       ? "Sending…"
       : status === "done"
-      ? "Saved"
-      : "Failed";
+        ? "Saved"
+        : "Failed";
   return (
     <span
       className={`rate-entry__row-badge rate-entry__row-badge--${status}`}
@@ -1201,8 +1200,8 @@ function SectionCells({
     const dropdownCodes = usePolDualDropdown
       ? (polDropdownOptions ?? [])
       : dmCtgValue && !polCategoryCodes.includes(dmCtgValue)
-      ? [dmCtgValue, ...polCategoryCodes]
-      : polCategoryCodes;
+        ? [dmCtgValue, ...polCategoryCodes]
+        : polCategoryCodes;
 
     const dropdownValue = usePolDualDropdown
       ? polDropdownValue ?? dmCtgValue
@@ -1291,8 +1290,8 @@ function SectionCells({
     usePolDualDropdown
       ? (polDropdownOptions ?? [])
       : dmCtgValue && !polCategoryCodes.includes(dmCtgValue)
-      ? [dmCtgValue, ...polCategoryCodes]
-      : polCategoryCodes;
+        ? [dmCtgValue, ...polCategoryCodes]
+        : polCategoryCodes;
 
   const dropdownValue = usePolDualDropdown
     ? polDropdownValue ?? dmCtgValue
@@ -1329,7 +1328,7 @@ function SectionCells({
       patch = usePolDualDropdown ? { polSp: code } : { dmCtg: code };
     }
 
-if (code && isPolSpCode(polRatesForLookup ?? [], code)) {
+    if (code && isPolSpCode(polRatesForLookup ?? [], code)) {
       patch = { ...patch, polRate: 0, prpRate: 0 };
     }
 
@@ -1457,7 +1456,7 @@ function EditableRateCell({
         onChange={(e) => {
           const raw = e.target.value.trim();
           if (raw === "") {
-            onChange(undefined);
+            onChange(0);
             return;
           }
           const parsed = Number.parseFloat(raw);

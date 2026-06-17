@@ -96,8 +96,8 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
     ? rateEntry.role === "POL"
       ? product.polRate + product.prpRate
       : rateEntry.role === "FIL"
-      ? product.filRate
-      : totalRate(product)
+        ? product.filRate
+        : totalRate(product)
     : totalRate(product);
 
   const showFilField =
@@ -111,24 +111,23 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
     rateEntry?.submitState === "submitting"
       ? "Submitting…"
       : rateEntry?.submitState === "done"
-      ? "Saved"
-      : rateEntry?.submitState === "error"
-      ? "Retry"
-      : rateEntry?.role === "FIL"
-      ? "Submit FIL rate"
-      : rateEntry?.role === "POL"
-      ? "Submit POL rate"
-      : "Submit approval";
+        ? "Saved"
+        : rateEntry?.submitState === "error"
+          ? "Retry"
+          : rateEntry?.role === "FIL"
+            ? "Submit FIL rate"
+            : rateEntry?.role === "POL"
+              ? "Submit POL rate"
+              : "Submit approval";
 
   return (
     <article
-      className={`product-card${
-        rateEntry?.submitState === "done"
+      className={`product-card${rateEntry?.submitState === "done"
           ? " product-card--saved"
           : rateEntry?.submitState === "error"
-          ? " product-card--error"
-          : ""
-      }`}
+            ? " product-card--error"
+            : ""
+        }`}
     >
       <header className="product-card__top">
         <div className="product-card__image">
@@ -276,21 +275,20 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                         : rateEntry.dmCtg
                     }
                     disabled={rateEntry.submitState === "submitting"}
-                    onChange={(e) =>
-                      {
-                        const val = e.target.value;
-                        if (rateEntry.usePolDualDropdown) {
-                          rateEntry.onPolOptionChange(val);
-                        } else {
-                          rateEntry.onDmCtgChange(val);
-                        }
-                        // If user switches to the special POL_SP option,
-                        // initialize editable POL/PRP inputs to 0.
-                        if (val === "POL_SP") {
-                          rateEntry.onPolRateChange(0);
-                          rateEntry.onPrpRateChange(0);
-                        }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (rateEntry.usePolDualDropdown) {
+                        rateEntry.onPolOptionChange(val);
+                      } else {
+                        rateEntry.onDmCtgChange(val);
                       }
+                      // If user switches to the special POL_SP option,
+                      // initialize editable POL/PRP inputs to 0.
+                      if (val === "POL_SP") {
+                        rateEntry.onPolRateChange(0);
+                        rateEntry.onPrpRateChange(0);
+                      }
+                    }
                     }
                   >
                     <option value="">Select category…</option>
@@ -300,14 +298,14 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
                           rateEntry.polDropdownValue
                         )
                         ? [
-                            rateEntry.polDropdownValue,
-                            ...rateEntry.polDropdownOptions,
-                          ]
+                          rateEntry.polDropdownValue,
+                          ...rateEntry.polDropdownOptions,
+                        ]
                         : rateEntry.polDropdownOptions
                       : rateEntry.dmCtg &&
                         !rateEntry.polCategoryCodes.includes(rateEntry.dmCtg)
-                      ? [rateEntry.dmCtg, ...rateEntry.polCategoryCodes]
-                      : rateEntry.polCategoryCodes
+                        ? [rateEntry.dmCtg, ...rateEntry.polCategoryCodes]
+                        : rateEntry.polCategoryCodes
                     ).map((code) => (
                       <option key={code} value={code}>
                         {code}
@@ -319,23 +317,22 @@ export default function ProductCard({ product, rateEntry }: ProductCardProps) {
             </div>
 
             {showPolField &&
-            (rateEntry.polRatesEditable ||
-              (rateEntry.polRate !== undefined &&
-                rateEntry.prpRate !== undefined)) ? (
+              (rateEntry.polRatesEditable ||
+                (rateEntry.polRate !== undefined &&
+                  rateEntry.prpRate !== undefined)) ? (
               <div
-                className={`product-card__entry-rates${
-                  rateEntry.polRatesEditable &&
-                  (rateEntry.usePolDualDropdown
-                    ? rateEntry.polDropdownValue && isPolSpCode(rateEntry.polRates ?? [], rateEntry.polDropdownValue)
-                    : rateEntry.dmCtg && isPolSpCode(rateEntry.polRates ?? [], rateEntry.dmCtg))
+                className={`product-card__entry-rates${rateEntry.polRatesEditable &&
+                    (rateEntry.usePolDualDropdown
+                      ? rateEntry.polDropdownValue && isPolSpCode(rateEntry.polRates ?? [], rateEntry.polDropdownValue)
+                      : rateEntry.dmCtg && isPolSpCode(rateEntry.polRates ?? [], rateEntry.dmCtg))
                     ? " product-card__entry-rates--editable"
                     : ""
-                }`}
+                  }`}
               >
                 {rateEntry.polRatesEditable &&
-                (rateEntry.usePolDualDropdown
-                  ? rateEntry.polDropdownValue && isPolSpCode(rateEntry.polRates ?? [], rateEntry.polDropdownValue)
-                  : rateEntry.dmCtg && isPolSpCode(rateEntry.polRates ?? [], rateEntry.dmCtg)) ? (
+                  (rateEntry.usePolDualDropdown
+                    ? rateEntry.polDropdownValue && isPolSpCode(rateEntry.polRates ?? [], rateEntry.polDropdownValue)
+                    : rateEntry.dmCtg && isPolSpCode(rateEntry.polRates ?? [], rateEntry.dmCtg)) ? (
                   <>
                     <CardRateInput
                       label="POL"
@@ -507,8 +504,8 @@ function CardRateInput({
     value !== undefined
       ? String(value)
       : suggested !== undefined
-      ? String(suggested)
-      : "0";
+        ? String(suggested)
+        : "0";
 
   return (
     <label
@@ -527,7 +524,7 @@ function CardRateInput({
         onChange={(e) => {
           const raw = e.target.value.trim();
           if (raw === "") {
-            onChange(undefined);
+            onChange(0);
             return;
           }
           const parsed = Number.parseFloat(raw);
