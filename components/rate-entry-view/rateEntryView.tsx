@@ -1342,6 +1342,7 @@ if (code && isPolSpCode(polRatesForLookup ?? [], code)) {
     (effectiveDifficulty ? getFilRate(effectiveDifficulty) : undefined);
 
   const isCurrentlyPolSp = dropdownValue && isPolSpCode(polRatesForLookup ?? [], dropdownValue);
+  const isCurrentlyFilSp = effectiveDifficulty?.endsWith("SP") ?? false;
 
   return (
     <>
@@ -1351,18 +1352,27 @@ if (code && isPolSpCode(polRatesForLookup ?? [], code)) {
           value={effectiveDifficulty}
           disabled={!editable}
           onSelect={(code) => {
-            const filRate = code === undefined ? undefined : getFilRate(code);
+            const filRate = code === undefined ? undefined : (code?.endsWith("SP") ? 0 : getFilRate(code));
             onPatch({ difficulty: code, filRate });
           }}
         />
       </td>
-      <td className={`${tdClass} rate-entry__td--num`}>
-        {effectiveFilRate !== undefined ? (
-          inr(effectiveFilRate)
-        ) : (
-          <span className="rate-entry__placeholder">—</span>
-        )}
-      </td>
+      {editable && isCurrentlyFilSp ? (
+        <EditableRateCell
+          tdClass={tdClass}
+          value={entry.filRate}
+          suggested={0}
+          onChange={(rate) => onPatch({ filRate: rate })}
+        />
+      ) : (
+        <td className={`${tdClass} rate-entry__td--num`}>
+          {effectiveFilRate !== undefined ? (
+            inr(effectiveFilRate)
+          ) : (
+            <span className="rate-entry__placeholder">—</span>
+          )}
+        </td>
+      )}
       <td className={tdClass}>
         <DifficultyDropdown
           codes={dropdownCodes}
