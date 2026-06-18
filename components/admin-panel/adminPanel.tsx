@@ -8,6 +8,7 @@ import "./adminPanel.css";
 import "./adminPanel-responsive.css";
 import "./adminPanel-header.css";
 import "./adminPanel-status.css";
+import "./adminPanel-manager.css";
 
 interface AdminPanelProps {
   user: Profile;
@@ -52,6 +53,23 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     message?: string;
     designIds?: string[];
   }>({ status: "idle" });
+  const [managerFromDate, setManagerFromDate] = useState<string>(() => todayString());
+  const [managerToDate, setManagerToDate] = useState<string>(() => todayString());
+  const [selectedManager, setSelectedManager] = useState<string>("");
+  const [managerEntries, setManagerEntries] = useState<{
+    status: "idle" | "loading" | "success" | "error";
+    message?: string;
+    products?: Product[];
+  }>({ status: "idle" });
+
+  const managerNames = [
+    "KIRAN NANJI VIRAS",
+    "BHAVIN KISHAN GORADIA",
+    "HARDIK KAPADIA",
+    "RAHUL K KHAIRE",
+    "RAJESH UTTAM LONDHE",
+    "AKASH CHODHARY"
+  ];
   const PAGE_SIZE = 10;
 
   const handleFetchDesigns = useCallback(async () => {
@@ -97,6 +115,23 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     }
   }, []);
 
+  const handleFetchManagerEntries = useCallback(async () => {
+    if (!managerFromDate || !managerToDate || managerFromDate > managerToDate || !selectedManager) return;
+    setManagerEntries({ status: "loading" });
+    try {
+      const products = await fetchDesignApprovals({
+        fromDate: managerFromDate,
+        toDate: managerToDate,
+        roleId: "4", // Manager role
+        managerName: selectedManager,
+      });
+      setManagerEntries({ status: "success", products });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to fetch manager entries.";
+      setManagerEntries({ status: "error", message });
+    }
+  }, [managerFromDate, managerToDate, selectedManager]);
+
   const filteredProducts = useMemo(() => {
     const products = loadState.products ?? [];
     if (!searchQuery.trim()) return products;
@@ -130,6 +165,14 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       handleFetchPolEntries();
     }
   }, [activeTab, polEntries.status, handleFetchPolEntries]);
+
+  // Auto-fetch manager entries when all inputs are valid
+  useEffect(() => {
+    if (activeTab === "manager-entries" && managerFromDate && managerToDate &&
+      managerFromDate <= managerToDate && selectedManager) {
+      handleFetchManagerEntries();
+    }
+  }, [activeTab, managerFromDate, managerToDate, selectedManager, handleFetchManagerEntries]);
 
   return (
     <div className="admin-panel">
@@ -447,9 +490,117 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {activeTab === "manager-entries" && (
             <section className="admin-section">
               <h2 className="admin-section-title">Manager entries</h2>
-              <div className="admin-placeholder">
-                <p>Review and manage manager-approved entries</p>
+              <div className="admin-date-filters">
+                <label className="admin-date-filter">
+                  <span>From date</span>
+                  <input
+                    type="date"
+                    value={managerFromDate}
+                    onChange={(e) => setManagerFromDate(e.target.value)}
+                    max={managerToDate}
+                  />
+                </label>
+                <label className="admin-date-filter">
+                  <span>To date</span>
+                  <input
+                    type="date"
+                    value={managerToDate}
+                    onChange={(e) => setManagerToDate(e.target.value)}
+                    min={managerFromDate}
+                  />
+                </label>
+                <div className="admin-date-filter">
+                  <span>Manager</span>
+                  <select
+                    className="admin-manager-select"
+                    value={selectedManager}
+                    onChange={(e) => setSelectedManager(e.target.value)}
+                  >
+                    <option value="">Select manager...</option>
+                    {managerNames.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+              {!managerFromDate || !managerToDate || !selectedManager ? (
+                <div className="admin-placeholder">
+                  <p>Select date range and manager to automatically load entries.</p>
+                </div>
+              ) : managerEntries.status === "loading" ? (
+                <div className="admin-placeholder">
+                  <p>Loading manager entries...</p>
+                </div>
+              ) : managerEntries.status === "error" ? (
+                <div className="admin-placeholder admin-placeholder--error">
+                  <p>Error: {managerEntries.message}</p>
+                  <button onClick={handleFetchManagerEntries}>Retry</button>
+                </div>
+              ) : managerEntries.status === "success" && managerEntries.products ? (
+                <div className="admin-designs-table">
+                  <div className="admin-table-wrapper">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Image</th>
+                          <th>Design</th>
+                          <th>Manager</th>
+                          <th>Cust Type</th>
+                          <th>Parts</th>
+                          <th>Manufacturer</th>
+                          <th>Location</th>
+                          <th>Difficulty</th>
+                          <th>FIL Rate</th>
+                          <th>POL Rate</th>
+                          <th>PRP Rate</th>
+                          <th>Dhaga Rate</th>
+                          <th>Client Code</th>
+                          <th>Category</th>
+                          <th>TP RM Ctg</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {managerEntries.products.map((product) => (
+                          <tr key={product.id}>
+                            <td>
+                              {product.imageUrl ? (
+                                <img
+                                  src={product.imageUrl}
+                                  alt={product.designCode}
+                                  style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "4px" }}
+                                />
+                              ) : (
+                                <span style={{ color: "#a0aec0", fontSize: "0.875rem" }}>No image found</span>
+                              )}
+                            </td>
+                            <td>{product.designCode}</td>
+                            <td>{product.managerName}</td>
+                            <td>{product.custType}</td>
+                            <td>{product.numberOfParts}</td>
+                            <td>{product.manufacturer}</td>
+                            <td>{product.dep}</td>
+                            <td>{product.difficulty}</td>
+                            <td>{inr(product.filRate)}</td>
+                            <td>{inr(product.polRate)}</td>
+                            <td>{inr(product.prpRate)}</td>
+                            <td>{inr(product.dhagaRate)}</td>
+                            <td>{product.custCode}</td>
+                            <td>{product.polCtg}</td>
+                            <td>{product.tpRmCtg || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {managerEntries.products.length === 0 && (
+                    <div className="admin-placeholder">
+                      <p>No entries found for the selected manager and date range.</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </section>
           )}
         </main>
