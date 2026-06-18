@@ -64,6 +64,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const [filVisibleCount, setFilVisibleCount] = useState(10);
   const [polVisibleCount, setPolVisibleCount] = useState(10);
   const [managerVisibleCount, setManagerVisibleCount] = useState(10);
+  const [filSearchQuery, setFilSearchQuery] = useState("");
+  const [polSearchQuery, setPolSearchQuery] = useState("");
+  const [managerSearchQuery, setManagerSearchQuery] = useState("");
 
   const managerNames = [
     "KIRAN NANJI VIRAS",
@@ -162,6 +165,33 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       p.difficulty.toLowerCase().includes(q)
     );
   }, [loadState.products, searchQuery]);
+
+  const filteredFilEntries = useMemo(() => {
+    const designIds = filEntries.designIds ?? [];
+    if (!filSearchQuery.trim()) return designIds;
+    const q = filSearchQuery.toLowerCase();
+    return designIds.filter(id => id.toLowerCase().includes(q));
+  }, [filEntries.designIds, filSearchQuery]);
+
+  const filteredPolEntries = useMemo(() => {
+    const designIds = polEntries.designIds ?? [];
+    if (!polSearchQuery.trim()) return designIds;
+    const q = polSearchQuery.toLowerCase();
+    return designIds.filter(id => id.toLowerCase().includes(q));
+  }, [polEntries.designIds, polSearchQuery]);
+
+  const filteredManagerEntries = useMemo(() => {
+    const products = managerEntries.products ?? [];
+    if (!managerSearchQuery.trim()) return products;
+    const q = managerSearchQuery.toLowerCase();
+    return products.filter(p =>
+      p.designCode.toLowerCase().includes(q) ||
+      p.managerName.toLowerCase().includes(q) ||
+      p.manufacturer.toLowerCase().includes(q) ||
+      p.custCode.toLowerCase().includes(q) ||
+      p.difficulty.toLowerCase().includes(q)
+    );
+  }, [managerEntries.products, managerSearchQuery]);
 
   // Auto-fetch when both dates are selected and valid
   useEffect(() => {
@@ -417,6 +447,20 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                 </div>
               )}
               {filEntries.status === "success" && filEntries.designIds && (
+                <div className="admin-date-filters">
+                  <div className="admin-date-filter admin-date-filter--search">
+                    <span>Search</span>
+                    <input
+                      type="text"
+                      placeholder="Search design IDs..."
+                      className="admin-search-bar-input"
+                      value={filSearchQuery}
+                      onChange={(e) => setFilSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+              {filEntries.status === "success" && filEntries.designIds && (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
@@ -427,7 +471,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {filEntries.designIds.slice(0, filVisibleCount).map((designId, index) => (
+                        {filteredFilEntries.slice(0, filVisibleCount).map((designId, index) => (
                           <tr key={designId}>
                             <td>{designId}</td>
                             <td>
@@ -440,17 +484,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       </tbody>
                     </table>
                   </div>
-                  {filEntries.designIds.length === 0 && (
+                  {filteredFilEntries.length === 0 && (
                     <div className="admin-placeholder">
-                      <p>No FIL entries found.</p>
+                      <p>{filSearchQuery ? `No results found for "${filSearchQuery}".` : "No FIL entries found."}</p>
                     </div>
                   )}
-                  {filEntries.designIds.length > filVisibleCount && (
+                  {filteredFilEntries.length > filVisibleCount && (
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMoreFil}>
-                        Show {Math.min(PAGE_SIZE, filEntries.designIds.length - filVisibleCount)} more
+                        Show {Math.min(PAGE_SIZE, filteredFilEntries.length - filVisibleCount)} more
                         <span className="admin-show-more-count">
-                          ({filEntries.designIds.length - filVisibleCount} remaining)
+                          ({filteredFilEntries.length - filVisibleCount} remaining)
                         </span>
                       </button>
                     </div>
@@ -481,6 +525,20 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                 </div>
               )}
               {polEntries.status === "success" && polEntries.designIds && (
+                <div className="admin-date-filters">
+                  <div className="admin-date-filter admin-date-filter--search">
+                    <span>Search</span>
+                    <input
+                      type="text"
+                      placeholder="Search design IDs..."
+                      className="admin-search-bar-input"
+                      value={polSearchQuery}
+                      onChange={(e) => setPolSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+              {polEntries.status === "success" && polEntries.designIds && (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
@@ -491,7 +549,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {polEntries.designIds.slice(0, polVisibleCount).map((designId, index) => (
+                        {filteredPolEntries.slice(0, polVisibleCount).map((designId, index) => (
                           <tr key={designId}>
                             <td>{designId}</td>
                             <td>
@@ -504,17 +562,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       </tbody>
                     </table>
                   </div>
-                  {polEntries.designIds.length === 0 && (
+                  {filteredPolEntries.length === 0 && (
                     <div className="admin-placeholder">
-                      <p>No POL entries found.</p>
+                      <p>{polSearchQuery ? `No results found for "${polSearchQuery}".` : "No POL entries found."}</p>
                     </div>
                   )}
-                  {polEntries.designIds.length > polVisibleCount && (
+                  {filteredPolEntries.length > polVisibleCount && (
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMorePol}>
-                        Show {Math.min(PAGE_SIZE, polEntries.designIds.length - polVisibleCount)} more
+                        Show {Math.min(PAGE_SIZE, filteredPolEntries.length - polVisibleCount)} more
                         <span className="admin-show-more-count">
-                          ({polEntries.designIds.length - polVisibleCount} remaining)
+                          ({filteredPolEntries.length - polVisibleCount} remaining)
                         </span>
                       </button>
                     </div>
@@ -563,6 +621,20 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   </select>
                 </div>
               </div>
+              {managerEntries.status === "success" && managerEntries.products && (
+                <div className="admin-date-filters">
+                  <div className="admin-date-filter admin-date-filter--search">
+                    <span>Search</span>
+                    <input
+                      type="text"
+                      placeholder="Search designs..."
+                      className="admin-search-bar-input"
+                      value={managerSearchQuery}
+                      onChange={(e) => setManagerSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
               {!managerFromDate || !managerToDate || !selectedManager ? (
                 <div className="admin-placeholder">
                   <p>Select date range and manager to automatically load entries.</p>
@@ -600,7 +672,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {managerEntries.products.slice(0, managerVisibleCount).map((product) => (
+                        {filteredManagerEntries.slice(0, managerVisibleCount).map((product) => (
                           <tr key={product.id}>
                             <td>
                               {product.imageUrl ? (
@@ -632,17 +704,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       </tbody>
                     </table>
                   </div>
-                  {managerEntries.products.length === 0 && (
+                  {filteredManagerEntries.length === 0 && (
                     <div className="admin-placeholder">
-                      <p>No entries found for the selected manager and date range.</p>
+                      <p>{managerSearchQuery ? `No results found for "${managerSearchQuery}".` : "No entries found for the selected manager and date range."}</p>
                     </div>
                   )}
-                  {managerEntries.products.length > managerVisibleCount && (
+                  {filteredManagerEntries.length > managerVisibleCount && (
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMoreManager}>
-                        Show {Math.min(PAGE_SIZE, managerEntries.products.length - managerVisibleCount)} more
+                        Show {Math.min(PAGE_SIZE, filteredManagerEntries.length - managerVisibleCount)} more
                         <span className="admin-show-more-count">
-                          ({managerEntries.products.length - managerVisibleCount} remaining)
+                          ({filteredManagerEntries.length - managerVisibleCount} remaining)
                         </span>
                       </button>
                     </div>
