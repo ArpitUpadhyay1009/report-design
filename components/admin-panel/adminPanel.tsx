@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Profile } from "@/types/profile";
 import type { Product } from "@/types/product";
-import { fetchDesignApprovals, fetchCompletedFilDesignIds } from "@/services/api";
+import { fetchDesignApprovals, fetchCompletedFilDesignIds, fetchCompletedPolDesignIds } from "@/services/api";
 import "./adminPanel.css";
 import "./adminPanel-responsive.css";
 import "./adminPanel-header.css";
@@ -47,6 +47,11 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     message?: string;
     designIds?: string[];
   }>({ status: "idle" });
+  const [polEntries, setPolEntries] = useState<{
+    status: "idle" | "loading" | "success" | "error";
+    message?: string;
+    designIds?: string[];
+  }>({ status: "idle" });
   const PAGE_SIZE = 10;
 
   const handleFetchDesigns = useCallback(async () => {
@@ -81,6 +86,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     }
   }, []);
 
+  const handleFetchPolEntries = useCallback(async () => {
+    setPolEntries({ status: "loading" });
+    try {
+      const designIds = await fetchCompletedPolDesignIds();
+      setPolEntries({ status: "success", designIds });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to fetch POL entries.";
+      setPolEntries({ status: "error", message });
+    }
+  }, []);
+
   const filteredProducts = useMemo(() => {
     const products = loadState.products ?? [];
     if (!searchQuery.trim()) return products;
@@ -107,6 +123,13 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       handleFetchFilEntries();
     }
   }, [activeTab, filEntries.status, handleFetchFilEntries]);
+
+  // Fetch POL entries when tab is active
+  useEffect(() => {
+    if (activeTab === "pol-entries" && polEntries.status === "idle") {
+      handleFetchPolEntries();
+    }
+  }, [activeTab, polEntries.status, handleFetchPolEntries]);
 
   return (
     <div className="admin-panel">
@@ -370,9 +393,53 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {activeTab === "pol-entries" && (
             <section className="admin-section">
               <h2 className="admin-section-title">POL entries</h2>
-              <div className="admin-placeholder">
-                <p>Review and manage POL rate entries</p>
-              </div>
+              {polEntries.status === "idle" && (
+                <div className="admin-placeholder">
+                  <p>Loading POL entries...</p>
+                </div>
+              )}
+              {polEntries.status === "loading" && (
+                <div className="admin-placeholder">
+                  <p>Loading POL entries...</p>
+                </div>
+              )}
+              {polEntries.status === "error" && (
+                <div className="admin-placeholder admin-placeholder--error">
+                  <p>Error: {polEntries.message}</p>
+                  <button onClick={handleFetchPolEntries}>Retry</button>
+                </div>
+              )}
+              {polEntries.status === "success" && polEntries.designIds && (
+                <div className="admin-designs-table">
+                  <div className="admin-table-wrapper">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Design ID</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {polEntries.designIds.map((designId, index) => (
+                          <tr key={designId}>
+                            <td>{designId}</td>
+                            <td>
+                              <span className="admin-status-badge admin-status-badge--success">
+                                POL Completed
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {polEntries.designIds.length === 0 && (
+                    <div className="admin-placeholder">
+                      <p>No POL entries found.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
