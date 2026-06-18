@@ -15,11 +15,11 @@ const custToneMap: Record<string, Tone> = {
 
 const toneFor = (custType: string): Tone => custToneMap[custType] ?? "amber";
 
-const inr = (n: number): string =>
+const inr = (n: number | undefined | null): string =>
   new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(n);
+  }).format(n ?? 0);
 
 interface ProductRowProps {
   product: Product;
@@ -32,8 +32,8 @@ export default function ProductRow({ product, role }: ProductRowProps) {
     role === "POL"
       ? (product.polRate ?? 0) + (product.prpRate ?? 0)
       : role === "FIL"
-      ? product.filRate ?? 0
-      : totalRate(product);
+        ? product.filRate ?? 0
+        : totalRate(product);
 
   return (
     <tr className="product-row">

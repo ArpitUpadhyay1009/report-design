@@ -1272,10 +1272,22 @@ export default function ProductsReport({
                       </th>
                     </tr>
                     <tr>
-                      <th>Diff</th>
-                      {user.role !== "POL" ? <th>{user.role === "FIL" ? "FIL rate" : "FIL"}</th> : null}
-                      {user.role !== "FIL" ? <th>POL</th> : null}
-                      {user.role !== "FIL" ? <th>PRP</th> : null}
+                      {user.role === "FIL" ? (
+                        <>
+                          <th />
+                          <th />
+                          <th />
+                          <th>Diff</th>
+                          <th>FIL rate</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>Diff</th>
+                          {user.role !== "POL" ? <th>FIL</th> : null}
+                          <th>POL</th>
+                          <th>PRP</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
