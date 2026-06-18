@@ -61,6 +61,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     message?: string;
     products?: Product[];
   }>({ status: "idle" });
+  const [filVisibleCount, setFilVisibleCount] = useState(10);
+  const [polVisibleCount, setPolVisibleCount] = useState(10);
+  const [managerVisibleCount, setManagerVisibleCount] = useState(10);
 
   const managerNames = [
     "KIRAN NANJI VIRAS",
@@ -93,8 +96,21 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     setVisibleCount(prev => prev + PAGE_SIZE);
   };
 
+  const handleShowMoreFil = () => {
+    setFilVisibleCount(prev => prev + PAGE_SIZE);
+  };
+
+  const handleShowMorePol = () => {
+    setPolVisibleCount(prev => prev + PAGE_SIZE);
+  };
+
+  const handleShowMoreManager = () => {
+    setManagerVisibleCount(prev => prev + PAGE_SIZE);
+  };
+
   const handleFetchFilEntries = useCallback(async () => {
     setFilEntries({ status: "loading" });
+    setFilVisibleCount(10); // Reset pagination
     try {
       const designIds = await fetchCompletedFilDesignIds();
       setFilEntries({ status: "success", designIds });
@@ -106,6 +122,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
 
   const handleFetchPolEntries = useCallback(async () => {
     setPolEntries({ status: "loading" });
+    setPolVisibleCount(10); // Reset pagination
     try {
       const designIds = await fetchCompletedPolDesignIds();
       setPolEntries({ status: "success", designIds });
@@ -118,6 +135,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const handleFetchManagerEntries = useCallback(async () => {
     if (!managerFromDate || !managerToDate || managerFromDate > managerToDate || !selectedManager) return;
     setManagerEntries({ status: "loading" });
+    setManagerVisibleCount(10); // Reset pagination
     try {
       const products = await fetchDesignApprovals({
         fromDate: managerFromDate,
@@ -409,7 +427,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {filEntries.designIds.map((designId, index) => (
+                        {filEntries.designIds.slice(0, filVisibleCount).map((designId, index) => (
                           <tr key={designId}>
                             <td>{designId}</td>
                             <td>
@@ -425,6 +443,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   {filEntries.designIds.length === 0 && (
                     <div className="admin-placeholder">
                       <p>No FIL entries found.</p>
+                    </div>
+                  )}
+                  {filEntries.designIds.length > filVisibleCount && (
+                    <div className="admin-show-more">
+                      <button className="admin-show-more-btn" onClick={handleShowMoreFil}>
+                        Show {Math.min(PAGE_SIZE, filEntries.designIds.length - filVisibleCount)} more
+                        <span className="admin-show-more-count">
+                          ({filEntries.designIds.length - filVisibleCount} remaining)
+                        </span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -463,7 +491,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {polEntries.designIds.map((designId, index) => (
+                        {polEntries.designIds.slice(0, polVisibleCount).map((designId, index) => (
                           <tr key={designId}>
                             <td>{designId}</td>
                             <td>
@@ -479,6 +507,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   {polEntries.designIds.length === 0 && (
                     <div className="admin-placeholder">
                       <p>No POL entries found.</p>
+                    </div>
+                  )}
+                  {polEntries.designIds.length > polVisibleCount && (
+                    <div className="admin-show-more">
+                      <button className="admin-show-more-btn" onClick={handleShowMorePol}>
+                        Show {Math.min(PAGE_SIZE, polEntries.designIds.length - polVisibleCount)} more
+                        <span className="admin-show-more-count">
+                          ({polEntries.designIds.length - polVisibleCount} remaining)
+                        </span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -562,7 +600,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {managerEntries.products.map((product) => (
+                        {managerEntries.products.slice(0, managerVisibleCount).map((product) => (
                           <tr key={product.id}>
                             <td>
                               {product.imageUrl ? (
@@ -597,6 +635,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   {managerEntries.products.length === 0 && (
                     <div className="admin-placeholder">
                       <p>No entries found for the selected manager and date range.</p>
+                    </div>
+                  )}
+                  {managerEntries.products.length > managerVisibleCount && (
+                    <div className="admin-show-more">
+                      <button className="admin-show-more-btn" onClick={handleShowMoreManager}>
+                        Show {Math.min(PAGE_SIZE, managerEntries.products.length - managerVisibleCount)} more
+                        <span className="admin-show-more-count">
+                          ({managerEntries.products.length - managerVisibleCount} remaining)
+                        </span>
+                      </button>
                     </div>
                   )}
                 </div>
