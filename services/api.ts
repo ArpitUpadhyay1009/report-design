@@ -521,6 +521,74 @@ export async function fetchCompletedFilDesignIds(): Promise<string[]> {
   return mapCompletedDesignIds(response.data?.data ?? []);
 }
 
+interface ManagerRateRow {
+  id: number;
+  design_id: string;
+  manager_user_id: string;
+  manager_status: string;
+  manager_submitted_at: string;
+  fil_rate?: string | null;
+  pol_rate?: string | null;
+  prp_rate?: string | null;
+  dhaga_rate?: string | null;
+  [key: string]: any;
+}
+
+interface ManagerRatesResponse {
+  status: string;
+  total?: number;
+  data: ManagerRateRow[];
+  message?: string;
+}
+
+export async function fetchManagerRatesByUser(empUniqId: string): Promise<ManagerRateRow[]> {
+  const body = new URLSearchParams();
+  body.append("EmpUniqId", empUniqId);
+  const response = await apiClient.post<ManagerRatesResponse>(
+    "/get-Manager-Rates-By-User",
+    body,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  return response.data?.data ?? [];
+}
+
+export interface DesignRateRow {
+  id: number;
+  design_id: string;
+  fil_rate?: string | null;
+  pol_rate?: string | null;
+  prp_rate?: string | null;
+  dhaga_rate?: string | null;
+  fil_status?: string | null;
+  pol_status?: string | null;
+  fil_submitted_at?: string | null;
+  pol_submitted_at?: string | null;
+  manager_status?: string | null;
+  manager_submitted_at?: string | null;
+  [key: string]: any;
+}
+
+interface DesignRateResponse {
+  status: string;
+  total?: number;
+  data: DesignRateRow[];
+  message?: string;
+}
+
+export async function fetchFilForAdmin(): Promise<DesignRateRow[]> {
+  const response = await apiClient.post<DesignRateResponse>(
+    "/get-Fil-For-Admin"
+  );
+  return response.data?.data ?? [];
+}
+
+export async function fetchPolForAdmin(): Promise<DesignRateRow[]> {
+  const response = await apiClient.post<DesignRateResponse>(
+    "/get-Pol-For-Admin"
+  );
+  return response.data?.data ?? [];
+}
+
 /** design_ids where pol_status = COMPLETED (POL rate entry). */
 export async function fetchCompletedPolDesignIds(): Promise<string[]> {
   const response = await apiClient.post<CompletedDesignIdsResponse>(
@@ -690,7 +758,7 @@ export async function loginWithEmpCode(
   if (!role) {
     throw new Error(
       `This account's role (EmpRoleid = ${payload.data.EmpRoleid ?? "?"}) ` +
-        `is not configured for the report. Contact an administrator.`
+      `is not configured for the report. Contact an administrator.`
     );
   }
 

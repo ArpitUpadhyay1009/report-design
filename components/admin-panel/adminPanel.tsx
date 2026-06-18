@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Profile } from "@/types/profile";
 import type { Product } from "@/types/product";
-import { fetchDesignApprovals, fetchCompletedFilDesignIds, fetchCompletedPolDesignIds } from "@/services/api";
+import { fetchDesignApprovals, fetchCompletedFilDesignIds, fetchCompletedPolDesignIds, fetchManagerRatesByUser, fetchFilForAdmin, fetchPolForAdmin } from "@/services/api";
+import type { DesignRateRow } from "@/services/api";
 import * as XLSX from "xlsx";
 import "./adminPanel.css";
 import "./adminPanel-responsive.css";
@@ -63,39 +64,85 @@ const handleExportAllDesigns = (products: Product[]) => {
   exportToExcel(data, 'all-designs');
 };
 
-const handleExportFilEntries = (designIds: string[]) => {
-  const data = designIds.map(id => ({
-    'Design ID': id,
-    'Status': 'FIL Completed'
+interface FilPolMergedRow {
+  designId: string;
+  difficulty: string;
+  systemFilRate: number;
+  systemPolRate: number;
+  systemPrpRate: number;
+  systemDhagaRate: number;
+  userFilRate: number | null;
+  userPolRate: number | null;
+  userPrpRate: number | null;
+  userDhagaRate: number | null;
+  status: string;
+  submittedAt: string;
+}
+
+const handleExportFilEntries = (rows: FilPolMergedRow[]) => {
+  const data = rows.map(row => ({
+    'Design ID': row.designId,
+    'Difficulty': row.difficulty,
+    'System FIL Rate': row.systemFilRate,
+    'System POL Rate': row.systemPolRate,
+    'System PRP Rate': row.systemPrpRate,
+    'System Dhaga Rate': row.systemDhagaRate,
+    'FIL User Rate': row.userFilRate ?? '',
+    'FIL User POL Rate': row.userPolRate ?? '',
+    'FIL User PRP Rate': row.userPrpRate ?? '',
+    'FIL User Dhaga Rate': row.userDhagaRate ?? '',
+    'Status': row.status,
+    'Submitted At': row.submittedAt,
   }));
   exportToExcel(data, 'fil-entries');
 };
 
-const handleExportPolEntries = (designIds: string[]) => {
-  const data = designIds.map(id => ({
-    'Design ID': id,
-    'Status': 'POL Completed'
+const handleExportPolEntries = (rows: FilPolMergedRow[]) => {
+  const data = rows.map(row => ({
+    'Design ID': row.designId,
+    'Difficulty': row.difficulty,
+    'System FIL Rate': row.systemFilRate,
+    'System POL Rate': row.systemPolRate,
+    'System PRP Rate': row.systemPrpRate,
+    'System Dhaga Rate': row.systemDhagaRate,
+    'POL User Rate': row.userPolRate ?? '',
+    'POL User FIL Rate': row.userFilRate ?? '',
+    'POL User PRP Rate': row.userPrpRate ?? '',
+    'POL User Dhaga Rate': row.userDhagaRate ?? '',
+    'Status': row.status,
+    'Submitted At': row.submittedAt,
   }));
   exportToExcel(data, 'pol-entries');
 };
 
-const handleExportManagerEntries = (products: Product[]) => {
-  const data = products.map(p => ({
-    'Design Code': p.designCode,
-    'Manager': p.managerName,
-    'Customer Type': p.custType,
-    'Parts': p.numberOfParts,
-    'Manufacturer': p.manufacturer,
-    'Location': p.dep,
-    'Difficulty': p.difficulty,
-    'FIL Rate': p.filRate,
-    'POL Rate': p.polRate,
-    'PRP Rate': p.prpRate,
-    'Dhaga Rate': p.dhagaRate,
-    'Client Code': p.custCode,
-    'Category': p.polCtg,
-    'TP RM Category': p.tpRmCtg || '',
-    'Image URL': p.imageUrl || ''
+const handleExportManagerEntries = (rows: {
+  designId: string;
+  managerName: string;
+  difficulty: string;
+  filRate: number;
+  polRate: number;
+  prpRate: number;
+  dhagaRate: number;
+  managerFilRate: number | null;
+  managerPolRate: number | null;
+  managerPrpRate: number | null;
+  managerDhagaRate: number | null;
+  managerStatus: string;
+  managerSubmittedAt: string;
+}[]) => {
+  const data = rows.map(row => ({
+    'Design ID': row.designId,
+    'Difficulty': row.difficulty,
+    'System FIL Rate': row.filRate,
+    'System POL Rate': row.polRate,
+    'System PRP Rate': row.prpRate,
+    'System Dhaga Rate': row.dhagaRate,
+    'Manager FIL Rate': row.managerFilRate ?? '',
+    'Manager POL Rate': row.managerPolRate ?? '',
+    'Manager PRP Rate': row.managerPrpRate ?? '',
+    'Manager Dhaga Rate': row.managerDhagaRate ?? '',
+    'Status': row.managerStatus,
+    'Submitted At': row.managerSubmittedAt,
   }));
   exportToExcel(data, 'manager-entries');
 };
@@ -111,15 +158,19 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   }>({ status: "idle" });
   const [visibleCount, setVisibleCount] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filFromDate, setFilFromDate] = useState<string>(() => todayString());
+  const [filToDate, setFilToDate] = useState<string>(() => todayString());
   const [filEntries, setFilEntries] = useState<{
     status: "idle" | "loading" | "success" | "error";
     message?: string;
-    designIds?: string[];
+    rows?: FilPolMergedRow[];
   }>({ status: "idle" });
+  const [polFromDate, setPolFromDate] = useState<string>(() => todayString());
+  const [polToDate, setPolToDate] = useState<string>(() => todayString());
   const [polEntries, setPolEntries] = useState<{
     status: "idle" | "loading" | "success" | "error";
     message?: string;
-    designIds?: string[];
+    rows?: FilPolMergedRow[];
   }>({ status: "idle" });
   const [managerFromDate, setManagerFromDate] = useState<string>(() => todayString());
   const [managerToDate, setManagerToDate] = useState<string>(() => todayString());
@@ -127,7 +178,21 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const [managerEntries, setManagerEntries] = useState<{
     status: "idle" | "loading" | "success" | "error";
     message?: string;
-    products?: Product[];
+    rows?: {
+      designId: string;
+      managerName: string;
+      difficulty: string;
+      filRate: number;
+      polRate: number;
+      prpRate: number;
+      dhagaRate: number;
+      managerFilRate: number | null;
+      managerPolRate: number | null;
+      managerPrpRate: number | null;
+      managerDhagaRate: number | null;
+      managerStatus: string;
+      managerSubmittedAt: string;
+    }[];
   }>({ status: "idle" });
   const [filVisibleCount, setFilVisibleCount] = useState(10);
   const [polVisibleCount, setPolVisibleCount] = useState(10);
@@ -144,6 +209,15 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     "RAJESH UTTAM LONDHE",
     "AKASH CHODHARY"
   ];
+
+  const managerToEmpUniqId: Record<string, string> = {
+    "KIRAN NANJI VIRAS": "5",
+    "BHAVIN KISHAN GORADIA": "322024",
+    "HARDIK KAPADIA": "324415",
+    "RAHUL K KHAIRE": "27",
+    "RAJESH UTTAM LONDHE": "500",
+    "AKASH CHODHARY": "324416"
+  };
   const PAGE_SIZE = 10;
 
   const handleFetchDesigns = useCallback(async () => {
@@ -179,47 +253,115 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     setManagerVisibleCount(prev => prev + PAGE_SIZE);
   };
 
+  const mergeRatesWithSystem = (rateRows: DesignRateRow[], systemProducts: Product[], type: "fil" | "pol"): FilPolMergedRow[] => {
+    const systemMap = new Map<string, Product>();
+    for (const p of systemProducts) {
+      systemMap.set(p.designCode.trim(), p);
+    }
+    return rateRows.map(rate => {
+      const sys = systemMap.get((rate.design_id ?? "").trim());
+      return {
+        designId: rate.design_id ?? "",
+        difficulty: sys?.difficulty ?? "",
+        systemFilRate: sys?.filRate ?? 0,
+        systemPolRate: sys?.polRate ?? 0,
+        systemPrpRate: sys?.prpRate ?? 0,
+        systemDhagaRate: sys?.dhagaRate ?? 0,
+        userFilRate: rate.fil_rate != null ? Number(rate.fil_rate) : null,
+        userPolRate: rate.pol_rate != null ? Number(rate.pol_rate) : null,
+        userPrpRate: rate.prp_rate != null ? Number(rate.prp_rate) : null,
+        userDhagaRate: rate.dhaga_rate != null ? Number(rate.dhaga_rate) : null,
+        status: type === "fil" ? (rate.fil_status ?? "") : (rate.pol_status ?? ""),
+        submittedAt: type === "fil" ? (rate.fil_submitted_at ?? "") : (rate.pol_submitted_at ?? ""),
+      };
+    });
+  };
+
   const handleFetchFilEntries = useCallback(async () => {
+    if (!filFromDate || !filToDate || filFromDate > filToDate) return;
     setFilEntries({ status: "loading" });
-    setFilVisibleCount(10); // Reset pagination
+    setFilVisibleCount(10);
     try {
-      const designIds = await fetchCompletedFilDesignIds();
-      setFilEntries({ status: "success", designIds });
+      const [filRates, systemProducts] = await Promise.all([
+        fetchFilForAdmin(),
+        fetchDesignApprovals({ fromDate: filFromDate, toDate: filToDate, roleId: user.empRoleId }),
+      ]);
+      const rows = mergeRatesWithSystem(filRates, systemProducts, "fil");
+      setFilEntries({ status: "success", rows });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to fetch FIL entries.";
       setFilEntries({ status: "error", message });
     }
-  }, []);
+  }, [filFromDate, filToDate, user.empRoleId]);
 
   const handleFetchPolEntries = useCallback(async () => {
+    if (!polFromDate || !polToDate || polFromDate > polToDate) return;
     setPolEntries({ status: "loading" });
-    setPolVisibleCount(10); // Reset pagination
+    setPolVisibleCount(10);
     try {
-      const designIds = await fetchCompletedPolDesignIds();
-      setPolEntries({ status: "success", designIds });
+      const [polRates, systemProducts] = await Promise.all([
+        fetchPolForAdmin(),
+        fetchDesignApprovals({ fromDate: polFromDate, toDate: polToDate, roleId: user.empRoleId }),
+      ]);
+      const rows = mergeRatesWithSystem(polRates, systemProducts, "pol");
+      setPolEntries({ status: "success", rows });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to fetch POL entries.";
       setPolEntries({ status: "error", message });
     }
-  }, []);
+  }, [polFromDate, polToDate, user.empRoleId]);
 
   const handleFetchManagerEntries = useCallback(async () => {
-    if (!managerFromDate || !managerToDate || managerFromDate > managerToDate || !selectedManager) return;
+    if (!selectedManager || !managerFromDate || !managerToDate || managerFromDate > managerToDate) return;
     setManagerEntries({ status: "loading" });
     setManagerVisibleCount(10); // Reset pagination
     try {
-      const products = await fetchDesignApprovals({
-        fromDate: managerFromDate,
-        toDate: managerToDate,
-        roleId: "4", // Manager role
-        managerName: selectedManager,
+      const empUniqId = managerToEmpUniqId[selectedManager];
+      if (!empUniqId) throw new Error("Manager not found in mapping.");
+
+      // Call both APIs in parallel
+      const [managerRates, systemProducts] = await Promise.all([
+        fetchManagerRatesByUser(empUniqId),
+        fetchDesignApprovals({
+          fromDate: managerFromDate,
+          toDate: managerToDate,
+          roleId: "4",
+          managerName: selectedManager,
+        }),
+      ]);
+
+      // Build lookup map from system products by designCode
+      const systemMap = new Map<string, typeof systemProducts[0]>();
+      for (const p of systemProducts) {
+        systemMap.set(p.designCode.trim(), p);
+      }
+
+      // Merge: one row per manager rate entry
+      const rows = managerRates.map(rate => {
+        const sysProduct = systemMap.get((rate.design_id ?? "").trim());
+        return {
+          designId: rate.design_id ?? "",
+          managerName: sysProduct?.managerName ?? selectedManager,
+          difficulty: sysProduct?.difficulty ?? "",
+          filRate: sysProduct?.filRate ?? 0,
+          polRate: sysProduct?.polRate ?? 0,
+          prpRate: sysProduct?.prpRate ?? 0,
+          dhagaRate: sysProduct?.dhagaRate ?? 0,
+          managerFilRate: rate.fil_rate != null ? Number(rate.fil_rate) : null,
+          managerPolRate: rate.pol_rate != null ? Number(rate.pol_rate) : null,
+          managerPrpRate: rate.prp_rate != null ? Number(rate.prp_rate) : null,
+          managerDhagaRate: rate.dhaga_rate != null ? Number(rate.dhaga_rate) : null,
+          managerStatus: rate.manager_status ?? "",
+          managerSubmittedAt: rate.manager_submitted_at ?? "",
+        };
       });
-      setManagerEntries({ status: "success", products });
+
+      setManagerEntries({ status: "success", rows });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to fetch manager entries.";
       setManagerEntries({ status: "error", message });
     }
-  }, [managerFromDate, managerToDate, selectedManager]);
+  }, [selectedManager, managerFromDate, managerToDate]);
 
   const filteredProducts = useMemo(() => {
     const products = loadState.products ?? [];
@@ -235,31 +377,35 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   }, [loadState.products, searchQuery]);
 
   const filteredFilEntries = useMemo(() => {
-    const designIds = filEntries.designIds ?? [];
-    if (!filSearchQuery.trim()) return designIds;
+    const rows = filEntries.rows ?? [];
+    if (!filSearchQuery.trim()) return rows;
     const q = filSearchQuery.toLowerCase();
-    return designIds.filter(id => id.toLowerCase().includes(q));
-  }, [filEntries.designIds, filSearchQuery]);
+    return rows.filter(row =>
+      row.designId.toLowerCase().includes(q) ||
+      row.difficulty.toLowerCase().includes(q)
+    );
+  }, [filEntries.rows, filSearchQuery]);
 
   const filteredPolEntries = useMemo(() => {
-    const designIds = polEntries.designIds ?? [];
-    if (!polSearchQuery.trim()) return designIds;
+    const rows = polEntries.rows ?? [];
+    if (!polSearchQuery.trim()) return rows;
     const q = polSearchQuery.toLowerCase();
-    return designIds.filter(id => id.toLowerCase().includes(q));
-  }, [polEntries.designIds, polSearchQuery]);
+    return rows.filter(row =>
+      row.designId.toLowerCase().includes(q) ||
+      row.difficulty.toLowerCase().includes(q)
+    );
+  }, [polEntries.rows, polSearchQuery]);
 
   const filteredManagerEntries = useMemo(() => {
-    const products = managerEntries.products ?? [];
-    if (!managerSearchQuery.trim()) return products;
+    const rows = managerEntries.rows ?? [];
+    if (!managerSearchQuery.trim()) return rows;
     const q = managerSearchQuery.toLowerCase();
-    return products.filter(p =>
-      p.designCode.toLowerCase().includes(q) ||
-      p.managerName.toLowerCase().includes(q) ||
-      p.manufacturer.toLowerCase().includes(q) ||
-      p.custCode.toLowerCase().includes(q) ||
-      p.difficulty.toLowerCase().includes(q)
+    return rows.filter(row =>
+      row.designId.toLowerCase().includes(q) ||
+      row.managerName.toLowerCase().includes(q) ||
+      row.difficulty.toLowerCase().includes(q)
     );
-  }, [managerEntries.products, managerSearchQuery]);
+  }, [managerEntries.rows, managerSearchQuery]);
 
   // Auto-fetch when both dates are selected and valid
   useEffect(() => {
@@ -268,27 +414,26 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     }
   }, [fromDate, toDate, handleFetchDesigns]);
 
-  // Fetch FIL entries when tab is active
+  // Auto-fetch FIL entries when tab is active and dates are valid
   useEffect(() => {
-    if (activeTab === "fil-entries" && filEntries.status === "idle") {
+    if (activeTab === "fil-entries" && filFromDate && filToDate && filFromDate <= filToDate) {
       handleFetchFilEntries();
     }
-  }, [activeTab, filEntries.status, handleFetchFilEntries]);
+  }, [activeTab, filFromDate, filToDate, handleFetchFilEntries]);
 
-  // Fetch POL entries when tab is active
+  // Auto-fetch POL entries when tab is active and dates are valid
   useEffect(() => {
-    if (activeTab === "pol-entries" && polEntries.status === "idle") {
+    if (activeTab === "pol-entries" && polFromDate && polToDate && polFromDate <= polToDate) {
       handleFetchPolEntries();
     }
-  }, [activeTab, polEntries.status, handleFetchPolEntries]);
+  }, [activeTab, polFromDate, polToDate, handleFetchPolEntries]);
 
   // Auto-fetch manager entries when all inputs are valid
   useEffect(() => {
-    if (activeTab === "manager-entries" && managerFromDate && managerToDate &&
-      managerFromDate <= managerToDate && selectedManager) {
+    if (activeTab === "manager-entries" && selectedManager && managerFromDate && managerToDate && managerFromDate <= managerToDate) {
       handleFetchManagerEntries();
     }
-  }, [activeTab, managerFromDate, managerToDate, selectedManager, handleFetchManagerEntries]);
+  }, [activeTab, selectedManager, managerFromDate, managerToDate, handleFetchManagerEntries]);
 
   return (
     <div className="admin-panel">
@@ -508,65 +653,77 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {activeTab === "fil-entries" && (
             <section className="admin-section">
               <h2 className="admin-section-title">FIL entries</h2>
-              {filEntries.status === "idle" && (
-                <div className="admin-placeholder">
-                  <p>Loading FIL entries...</p>
+              <div className="admin-date-filters">
+                <label className="admin-date-filter">
+                  <span>From date</span>
+                  <input type="date" value={filFromDate} onChange={(e) => setFilFromDate(e.target.value)} max={filToDate} />
+                </label>
+                <label className="admin-date-filter">
+                  <span>To date</span>
+                  <input type="date" value={filToDate} onChange={(e) => setFilToDate(e.target.value)} min={filFromDate} />
+                </label>
+              </div>
+              {filEntries.status === "success" && filEntries.rows && (
+                <div className="admin-date-filters">
+                  <div className="admin-date-filter admin-date-filter--search">
+                    <span>Search</span>
+                    <input type="text" placeholder="Search designs..." className="admin-search-bar-input" value={filSearchQuery} onChange={(e) => setFilSearchQuery(e.target.value)} />
+                  </div>
                 </div>
               )}
-              {filEntries.status === "loading" && (
-                <div className="admin-placeholder">
-                  <p>Loading FIL entries...</p>
+              {filEntries.status === "success" && filEntries.rows && filEntries.rows.length > 0 && (
+                <div className="admin-export">
+                  <button className="admin-export-btn" onClick={() => handleExportFilEntries(filEntries.rows!)}>📊 Export to Excel</button>
                 </div>
               )}
-              {filEntries.status === "error" && (
+              {filEntries.status === "loading" ? (
+                <div className="admin-placeholder"><p>Loading FIL entries...</p></div>
+              ) : filEntries.status === "error" ? (
                 <div className="admin-placeholder admin-placeholder--error">
                   <p>Error: {filEntries.message}</p>
                   <button onClick={handleFetchFilEntries}>Retry</button>
                 </div>
-              )}
-              {filEntries.status === "success" && filEntries.designIds && (
-                <div className="admin-date-filters">
-                  <div className="admin-date-filter admin-date-filter--search">
-                    <span>Search</span>
-                    <input
-                      type="text"
-                      placeholder="Search design IDs..."
-                      className="admin-search-bar-input"
-                      value={filSearchQuery}
-                      onChange={(e) => setFilSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-              {filEntries.status === "success" && filEntries.designIds && filEntries.designIds.length > 0 && (
-                <div className="admin-export">
-                  <button
-                    className="admin-export-btn"
-                    onClick={() => handleExportFilEntries(filEntries.designIds!)}
-                  >
-                    📊 Export to Excel
-                  </button>
-                </div>
-              )}
-              {filEntries.status === "success" && filEntries.designIds && (
+              ) : filEntries.status === "success" && filEntries.rows ? (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Design ID</th>
-                          <th>Status</th>
+                          <th rowSpan={2}>Design ID</th>
+                          <th rowSpan={2}>Difficulty</th>
+                          <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
+                          <th colSpan={4} style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>FIL User Rates</th>
+                          <th rowSpan={2}>Status</th>
+                          <th rowSpan={2}>Submitted At</th>
+                        </tr>
+                        <tr>
+                          <th style={{ background: "#ebf4ff" }}>FIL</th>
+                          <th style={{ background: "#ebf4ff" }}>POL</th>
+                          <th style={{ background: "#ebf4ff" }}>PRP</th>
+                          <th style={{ background: "#ebf4ff" }}>Dhaga</th>
+                          <th style={{ background: "#f0fff4" }}>FIL</th>
+                          <th style={{ background: "#f0fff4" }}>POL</th>
+                          <th style={{ background: "#f0fff4" }}>PRP</th>
+                          <th style={{ background: "#f0fff4" }}>Dhaga</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredFilEntries.slice(0, filVisibleCount).map((designId, index) => (
-                          <tr key={designId}>
-                            <td>{designId}</td>
+                        {filteredFilEntries.slice(0, filVisibleCount).map((row, idx) => (
+                          <tr key={`${row.designId}-${idx}`}>
+                            <td>{row.designId}</td>
+                            <td>{row.difficulty || "—"}</td>
+                            <td>{inr(row.systemFilRate)}</td>
+                            <td>{inr(row.systemPolRate)}</td>
+                            <td>{inr(row.systemPrpRate)}</td>
+                            <td>{inr(row.systemDhagaRate)}</td>
+                            <td>{row.userFilRate != null ? inr(row.userFilRate) : "—"}</td>
+                            <td>{row.userPolRate != null ? inr(row.userPolRate) : "—"}</td>
+                            <td>{row.userPrpRate != null ? inr(row.userPrpRate) : "—"}</td>
+                            <td>{row.userDhagaRate != null ? inr(row.userDhagaRate) : "—"}</td>
                             <td>
-                              <span className="admin-status-badge admin-status-badge--success">
-                                FIL Completed
-                              </span>
+                              <span className="admin-status-badge admin-status-badge--success">{row.status}</span>
                             </td>
+                            <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -581,14 +738,12 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMoreFil}>
                         Show {Math.min(PAGE_SIZE, filteredFilEntries.length - filVisibleCount)} more
-                        <span className="admin-show-more-count">
-                          ({filteredFilEntries.length - filVisibleCount} remaining)
-                        </span>
+                        <span className="admin-show-more-count">({filteredFilEntries.length - filVisibleCount} remaining)</span>
                       </button>
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
             </section>
           )}
 
@@ -596,65 +751,77 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {activeTab === "pol-entries" && (
             <section className="admin-section">
               <h2 className="admin-section-title">POL entries</h2>
-              {polEntries.status === "idle" && (
-                <div className="admin-placeholder">
-                  <p>Loading POL entries...</p>
+              <div className="admin-date-filters">
+                <label className="admin-date-filter">
+                  <span>From date</span>
+                  <input type="date" value={polFromDate} onChange={(e) => setPolFromDate(e.target.value)} max={polToDate} />
+                </label>
+                <label className="admin-date-filter">
+                  <span>To date</span>
+                  <input type="date" value={polToDate} onChange={(e) => setPolToDate(e.target.value)} min={polFromDate} />
+                </label>
+              </div>
+              {polEntries.status === "success" && polEntries.rows && (
+                <div className="admin-date-filters">
+                  <div className="admin-date-filter admin-date-filter--search">
+                    <span>Search</span>
+                    <input type="text" placeholder="Search designs..." className="admin-search-bar-input" value={polSearchQuery} onChange={(e) => setPolSearchQuery(e.target.value)} />
+                  </div>
                 </div>
               )}
-              {polEntries.status === "loading" && (
-                <div className="admin-placeholder">
-                  <p>Loading POL entries...</p>
+              {polEntries.status === "success" && polEntries.rows && polEntries.rows.length > 0 && (
+                <div className="admin-export">
+                  <button className="admin-export-btn" onClick={() => handleExportPolEntries(polEntries.rows!)}>📊 Export to Excel</button>
                 </div>
               )}
-              {polEntries.status === "error" && (
+              {polEntries.status === "loading" ? (
+                <div className="admin-placeholder"><p>Loading POL entries...</p></div>
+              ) : polEntries.status === "error" ? (
                 <div className="admin-placeholder admin-placeholder--error">
                   <p>Error: {polEntries.message}</p>
                   <button onClick={handleFetchPolEntries}>Retry</button>
                 </div>
-              )}
-              {polEntries.status === "success" && polEntries.designIds && (
-                <div className="admin-date-filters">
-                  <div className="admin-date-filter admin-date-filter--search">
-                    <span>Search</span>
-                    <input
-                      type="text"
-                      placeholder="Search design IDs..."
-                      className="admin-search-bar-input"
-                      value={polSearchQuery}
-                      onChange={(e) => setPolSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-              {polEntries.status === "success" && polEntries.designIds && polEntries.designIds.length > 0 && (
-                <div className="admin-export">
-                  <button
-                    className="admin-export-btn"
-                    onClick={() => handleExportPolEntries(polEntries.designIds!)}
-                  >
-                    📊 Export to Excel
-                  </button>
-                </div>
-              )}
-              {polEntries.status === "success" && polEntries.designIds && (
+              ) : polEntries.status === "success" && polEntries.rows ? (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Design ID</th>
-                          <th>Status</th>
+                          <th rowSpan={2}>Design ID</th>
+                          <th rowSpan={2}>Difficulty</th>
+                          <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
+                          <th colSpan={4} style={{ textAlign: "center", background: "#fdf2f8", color: "#97266d" }}>POL User Rates</th>
+                          <th rowSpan={2}>Status</th>
+                          <th rowSpan={2}>Submitted At</th>
+                        </tr>
+                        <tr>
+                          <th style={{ background: "#ebf4ff" }}>FIL</th>
+                          <th style={{ background: "#ebf4ff" }}>POL</th>
+                          <th style={{ background: "#ebf4ff" }}>PRP</th>
+                          <th style={{ background: "#ebf4ff" }}>Dhaga</th>
+                          <th style={{ background: "#fdf2f8" }}>FIL</th>
+                          <th style={{ background: "#fdf2f8" }}>POL</th>
+                          <th style={{ background: "#fdf2f8" }}>PRP</th>
+                          <th style={{ background: "#fdf2f8" }}>Dhaga</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredPolEntries.slice(0, polVisibleCount).map((designId, index) => (
-                          <tr key={designId}>
-                            <td>{designId}</td>
+                        {filteredPolEntries.slice(0, polVisibleCount).map((row, idx) => (
+                          <tr key={`${row.designId}-${idx}`}>
+                            <td>{row.designId}</td>
+                            <td>{row.difficulty || "—"}</td>
+                            <td>{inr(row.systemFilRate)}</td>
+                            <td>{inr(row.systemPolRate)}</td>
+                            <td>{inr(row.systemPrpRate)}</td>
+                            <td>{inr(row.systemDhagaRate)}</td>
+                            <td>{row.userFilRate != null ? inr(row.userFilRate) : "—"}</td>
+                            <td>{row.userPolRate != null ? inr(row.userPolRate) : "—"}</td>
+                            <td>{row.userPrpRate != null ? inr(row.userPrpRate) : "—"}</td>
+                            <td>{row.userDhagaRate != null ? inr(row.userDhagaRate) : "—"}</td>
                             <td>
-                              <span className="admin-status-badge admin-status-badge--success">
-                                POL Completed
-                              </span>
+                              <span className="admin-status-badge admin-status-badge--success">{row.status}</span>
                             </td>
+                            <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -669,14 +836,12 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMorePol}>
                         Show {Math.min(PAGE_SIZE, filteredPolEntries.length - polVisibleCount)} more
-                        <span className="admin-show-more-count">
-                          ({filteredPolEntries.length - polVisibleCount} remaining)
-                        </span>
+                        <span className="admin-show-more-count">({filteredPolEntries.length - polVisibleCount} remaining)</span>
                       </button>
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
             </section>
           )}
 
@@ -719,7 +884,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   </select>
                 </div>
               </div>
-              {managerEntries.status === "success" && managerEntries.products && (
+              {managerEntries.status === "success" && managerEntries.rows && (
                 <div className="admin-date-filters">
                   <div className="admin-date-filter admin-date-filter--search">
                     <span>Search</span>
@@ -733,17 +898,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   </div>
                 </div>
               )}
-              {managerEntries.status === "success" && managerEntries.products && managerEntries.products.length > 0 && (
+              {managerEntries.status === "success" && managerEntries.rows && managerEntries.rows.length > 0 && (
                 <div className="admin-export">
                   <button
                     className="admin-export-btn"
-                    onClick={() => handleExportManagerEntries(managerEntries.products!)}
+                    onClick={() => handleExportManagerEntries(managerEntries.rows!)}
                   >
                     📊 Export to Excel
                   </button>
                 </div>
               )}
-              {!managerFromDate || !managerToDate || !selectedManager ? (
+              {!selectedManager || !managerFromDate || !managerToDate ? (
                 <div className="admin-placeholder">
                   <p>Select date range and manager to automatically load entries.</p>
                 </div>
@@ -756,57 +921,49 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   <p>Error: {managerEntries.message}</p>
                   <button onClick={handleFetchManagerEntries}>Retry</button>
                 </div>
-              ) : managerEntries.status === "success" && managerEntries.products ? (
+              ) : managerEntries.status === "success" && managerEntries.rows ? (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Image</th>
-                          <th>Design</th>
-                          <th>Manager</th>
-                          <th>Cust Type</th>
-                          <th>Parts</th>
-                          <th>Manufacturer</th>
-                          <th>Location</th>
-                          <th>Difficulty</th>
-                          <th>FIL Rate</th>
-                          <th>POL Rate</th>
-                          <th>PRP Rate</th>
-                          <th>Dhaga Rate</th>
-                          <th>Client Code</th>
-                          <th>Category</th>
-                          <th>TP RM Ctg</th>
+                          <th rowSpan={2}>Design ID</th>
+                          <th rowSpan={2}>Difficulty</th>
+                          <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
+                          <th colSpan={4} style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>Manager Rates</th>
+                          <th rowSpan={2}>Status</th>
+                          <th rowSpan={2}>Submitted At</th>
+                        </tr>
+                        <tr>
+                          <th style={{ background: "#ebf4ff" }}>FIL</th>
+                          <th style={{ background: "#ebf4ff" }}>POL</th>
+                          <th style={{ background: "#ebf4ff" }}>PRP</th>
+                          <th style={{ background: "#ebf4ff" }}>Dhaga</th>
+                          <th style={{ background: "#f0fff4" }}>Mgr FIL</th>
+                          <th style={{ background: "#f0fff4" }}>Mgr POL</th>
+                          <th style={{ background: "#f0fff4" }}>Mgr PRP</th>
+                          <th style={{ background: "#f0fff4" }}>Mgr Dhaga</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredManagerEntries.slice(0, managerVisibleCount).map((product) => (
-                          <tr key={product.id}>
+                        {filteredManagerEntries.slice(0, managerVisibleCount).map((row, idx) => (
+                          <tr key={`${row.designId}-${idx}`}>
+                            <td>{row.designId}</td>
+                            <td>{row.difficulty || "—"}</td>
+                            <td>{inr(row.filRate)}</td>
+                            <td>{inr(row.polRate)}</td>
+                            <td>{inr(row.prpRate)}</td>
+                            <td>{inr(row.dhagaRate)}</td>
+                            <td>{row.managerFilRate != null ? inr(row.managerFilRate) : "—"}</td>
+                            <td>{row.managerPolRate != null ? inr(row.managerPolRate) : "—"}</td>
+                            <td>{row.managerPrpRate != null ? inr(row.managerPrpRate) : "—"}</td>
+                            <td>{row.managerDhagaRate != null ? inr(row.managerDhagaRate) : "—"}</td>
                             <td>
-                              {product.imageUrl ? (
-                                <img
-                                  src={product.imageUrl}
-                                  alt={product.designCode}
-                                  style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "4px" }}
-                                />
-                              ) : (
-                                <span style={{ color: "#a0aec0", fontSize: "0.875rem" }}>No image found</span>
-                              )}
+                              <span className="admin-status-badge admin-status-badge--success">
+                                {row.managerStatus}
+                              </span>
                             </td>
-                            <td>{product.designCode}</td>
-                            <td>{product.managerName}</td>
-                            <td>{product.custType}</td>
-                            <td>{product.numberOfParts}</td>
-                            <td>{product.manufacturer}</td>
-                            <td>{product.dep}</td>
-                            <td>{product.difficulty}</td>
-                            <td>{inr(product.filRate)}</td>
-                            <td>{inr(product.polRate)}</td>
-                            <td>{inr(product.prpRate)}</td>
-                            <td>{inr(product.dhagaRate)}</td>
-                            <td>{product.custCode}</td>
-                            <td>{product.polCtg}</td>
-                            <td>{product.tpRmCtg || "—"}</td>
+                            <td>{row.managerSubmittedAt ? new Date(row.managerSubmittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -814,7 +971,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   </div>
                   {filteredManagerEntries.length === 0 && (
                     <div className="admin-placeholder">
-                      <p>{managerSearchQuery ? `No results found for "${managerSearchQuery}".` : "No entries found for the selected manager and date range."}</p>
+                      <p>{managerSearchQuery ? `No results found for "${managerSearchQuery}".` : "No entries found for the selected manager."}</p>
                     </div>
                   )}
                   {filteredManagerEntries.length > managerVisibleCount && (
