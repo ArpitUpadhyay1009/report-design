@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Profile } from "@/types/profile";
 import type { Product } from "@/types/product";
 import { fetchDesignApprovals, fetchCompletedFilDesignIds, fetchCompletedPolDesignIds } from "@/services/api";
+import * as XLSX from "xlsx";
 import "./adminPanel.css";
 import "./adminPanel-responsive.css";
 import "./adminPanel-header.css";
 import "./adminPanel-status.css";
 import "./adminPanel-manager.css";
+import "./adminPanel-export.css";
 
 interface AdminPanelProps {
   user: Profile;
@@ -31,6 +33,72 @@ const inr = (n: number | undefined | null): string =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n ?? 0);
+
+// Excel Export utilities
+const exportToExcel = (data: any[], filename: string) => {
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data");
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+};
+
+const handleExportAllDesigns = (products: Product[]) => {
+  const data = products.map(p => ({
+    'Design Code': p.designCode,
+    'Manager': p.managerName,
+    'Customer Type': p.custType,
+    'Parts': p.numberOfParts,
+    'Manufacturer': p.manufacturer,
+    'Location': p.dep,
+    'Difficulty': p.difficulty,
+    'FIL Rate': p.filRate,
+    'POL Rate': p.polRate,
+    'PRP Rate': p.prpRate,
+    'Dhaga Rate': p.dhagaRate,
+    'Client Code': p.custCode,
+    'Category': p.polCtg,
+    'TP RM Category': p.tpRmCtg || '',
+    'Image URL': p.imageUrl || ''
+  }));
+  exportToExcel(data, 'all-designs');
+};
+
+const handleExportFilEntries = (designIds: string[]) => {
+  const data = designIds.map(id => ({
+    'Design ID': id,
+    'Status': 'FIL Completed'
+  }));
+  exportToExcel(data, 'fil-entries');
+};
+
+const handleExportPolEntries = (designIds: string[]) => {
+  const data = designIds.map(id => ({
+    'Design ID': id,
+    'Status': 'POL Completed'
+  }));
+  exportToExcel(data, 'pol-entries');
+};
+
+const handleExportManagerEntries = (products: Product[]) => {
+  const data = products.map(p => ({
+    'Design Code': p.designCode,
+    'Manager': p.managerName,
+    'Customer Type': p.custType,
+    'Parts': p.numberOfParts,
+    'Manufacturer': p.manufacturer,
+    'Location': p.dep,
+    'Difficulty': p.difficulty,
+    'FIL Rate': p.filRate,
+    'POL Rate': p.polRate,
+    'PRP Rate': p.prpRate,
+    'Dhaga Rate': p.dhagaRate,
+    'Client Code': p.custCode,
+    'Category': p.polCtg,
+    'TP RM Category': p.tpRmCtg || '',
+    'Image URL': p.imageUrl || ''
+  }));
+  exportToExcel(data, 'manager-entries');
+};
 
 export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("all-designs");
@@ -322,6 +390,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   />
                 </div>
               </div>
+              {loadState.status === "success" && loadState.products && loadState.products.length > 0 && (
+                <div className="admin-export">
+                  <button
+                    className="admin-export-btn"
+                    onClick={() => handleExportAllDesigns(loadState.products!)}
+                  >
+                    📊 Export to Excel
+                  </button>
+                </div>
+              )}
               {loadState.status === "idle" && (
                 <div className="admin-placeholder">
                   <p>Select a date range to automatically load designs.</p>
@@ -460,6 +538,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   </div>
                 </div>
               )}
+              {filEntries.status === "success" && filEntries.designIds && filEntries.designIds.length > 0 && (
+                <div className="admin-export">
+                  <button
+                    className="admin-export-btn"
+                    onClick={() => handleExportFilEntries(filEntries.designIds!)}
+                  >
+                    📊 Export to Excel
+                  </button>
+                </div>
+              )}
               {filEntries.status === "success" && filEntries.designIds && (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
@@ -536,6 +624,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       onChange={(e) => setPolSearchQuery(e.target.value)}
                     />
                   </div>
+                </div>
+              )}
+              {polEntries.status === "success" && polEntries.designIds && polEntries.designIds.length > 0 && (
+                <div className="admin-export">
+                  <button
+                    className="admin-export-btn"
+                    onClick={() => handleExportPolEntries(polEntries.designIds!)}
+                  >
+                    📊 Export to Excel
+                  </button>
                 </div>
               )}
               {polEntries.status === "success" && polEntries.designIds && (
@@ -633,6 +731,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       onChange={(e) => setManagerSearchQuery(e.target.value)}
                     />
                   </div>
+                </div>
+              )}
+              {managerEntries.status === "success" && managerEntries.products && managerEntries.products.length > 0 && (
+                <div className="admin-export">
+                  <button
+                    className="admin-export-btn"
+                    onClick={() => handleExportManagerEntries(managerEntries.products!)}
+                  >
+                    📊 Export to Excel
+                  </button>
                 </div>
               )}
               {!managerFromDate || !managerToDate || !selectedManager ? (
