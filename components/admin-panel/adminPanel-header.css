@@ -1,0 +1,70 @@
+/* Date filters bar — compact + search */
+
+.admin-date-filters {
+  padding: 0.75rem 1.25rem !important;
+  margin-bottom: 1.25rem !important;
+  flex-wrap: wrap;
+}
+
+.admin-date-filter {
+  max-width: 160px !important;
+}
+
+.admin-date-filter span {
+  font-size: 0.75rem !important;
+  letter-spacing: 0.4px;
+}
+
+.admin-date-filter input[type="date"] {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  min-height: 36px !important;
+}
+
+.admin-date-filter--search {
+  flex: 2;
+  max-width: 360px !important;
+}
+
+.admin-search-bar-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #2d3748;
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  min-height: 36px;
+}
+
+.admin-search-bar-input:hover {
+  border-color: #cbd5e0;
+  background: white;
+}
+
+.admin-search-bar-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.admin-search-bar-input::placeholder {
+  color: #a0aec0;
+}
+
+.admin-date-filter--search {
+  position: relative;
+}
+
+.admin-date-filter--search::before {
+  content: "🔍";
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.6rem;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 1;
+}

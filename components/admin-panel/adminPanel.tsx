@@ -6,6 +6,7 @@ import type { Product } from "@/types/product";
 import { fetchDesignApprovals } from "@/services/api";
 import "./adminPanel.css";
 import "./adminPanel-responsive.css";
+import "./adminPanel-header.css";
 
 interface AdminPanelProps {
   user: Profile;
@@ -39,6 +40,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     products?: Product[];
   }>({ status: "idle" });
   const [visibleCount, setVisibleCount] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("");
   const PAGE_SIZE = 10;
 
   const handleFetchDesigns = useCallback(async () => {
@@ -61,6 +63,19 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const handleShowMore = () => {
     setVisibleCount(prev => prev + PAGE_SIZE);
   };
+
+  const filteredProducts = useMemo(() => {
+    const products = loadState.products ?? [];
+    if (!searchQuery.trim()) return products;
+    const q = searchQuery.toLowerCase();
+    return products.filter(p =>
+      p.designCode.toLowerCase().includes(q) ||
+      p.managerName.toLowerCase().includes(q) ||
+      p.manufacturer.toLowerCase().includes(q) ||
+      p.custCode.toLowerCase().includes(q) ||
+      p.difficulty.toLowerCase().includes(q)
+    );
+  }, [loadState.products, searchQuery]);
 
   // Auto-fetch when both dates are selected and valid
   useEffect(() => {
@@ -158,6 +173,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                     min={fromDate}
                   />
                 </label>
+                <div className="admin-date-filter admin-date-filter--search">
+                  <span>Search</span>
+                  <input
+                    type="text"
+                    placeholder="Search designs..."
+                    className="admin-search-bar-input"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
               {loadState.status === "idle" && (
                 <div className="admin-placeholder">
@@ -199,7 +224,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {loadState.products.slice(0, visibleCount).map((product) => (
+                        {filteredProducts.slice(0, visibleCount).map((product) => (
                           <tr key={product.id}>
                             <td>
                               {product.imageUrl ? (
@@ -243,17 +268,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       </tbody>
                     </table>
                   </div>
-                  {loadState.products.length === 0 && (
+                  {filteredProducts.length === 0 && (
                     <div className="admin-placeholder">
-                      <p>No designs found for the selected date range.</p>
+                      <p>{searchQuery ? `No results found for "${searchQuery}".` : "No designs found for the selected date range."}</p>
                     </div>
                   )}
-                  {loadState.products.length > visibleCount && (
+                  {filteredProducts.length > visibleCount && (
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMore}>
-                        Show {Math.min(PAGE_SIZE, loadState.products.length - visibleCount)} more
+                        Show {Math.min(PAGE_SIZE, filteredProducts.length - visibleCount)} more
                         <span className="admin-show-more-count">
-                          ({loadState.products.length - visibleCount} remaining)
+                          ({filteredProducts.length - visibleCount} remaining)
                         </span>
                       </button>
                     </div>
