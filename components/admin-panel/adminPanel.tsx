@@ -22,6 +22,12 @@ const formatDate = (d: Date): string => {
 
 const todayString = () => formatDate(new Date());
 
+const inr = (n: number | undefined | null): string =>
+  new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n ?? 0);
+
 export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("all-designs");
   const [fromDate, setFromDate] = useState<string>(() => todayString());
@@ -47,6 +53,13 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       setLoadState({ status: "error", message });
     }
   }, [fromDate, toDate, user.empRoleId]);
+
+  // Auto-fetch when both dates are selected and valid
+  useEffect(() => {
+    if (fromDate && toDate && fromDate <= toDate) {
+      handleFetchDesigns();
+    }
+  }, [fromDate, toDate, handleFetchDesigns]);
 
   return (
     <div className="admin-panel">
@@ -137,17 +150,10 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                     min={fromDate}
                   />
                 </label>
-                <button
-                  className="admin-fetch-btn"
-                  onClick={handleFetchDesigns}
-                  disabled={loadState.status === "loading" || !fromDate || !toDate || fromDate > toDate}
-                >
-                  {loadState.status === "loading" ? "Fetching…" : "Fetch designs"}
-                </button>
               </div>
               {loadState.status === "idle" && (
                 <div className="admin-placeholder">
-                  <p>Select a date range and click "Fetch designs" to load data.</p>
+                  <p>Select a date range to automatically load designs.</p>
                 </div>
               )}
               {loadState.status === "loading" && (
@@ -166,23 +172,63 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   <table className="admin-table">
                     <thead>
                       <tr>
+                        <th>Image</th>
                         <th>Design</th>
                         <th>Manager</th>
-                        <th>Customer</th>
-                        <th>Manufacturer</th>
+                        <th>Cust Type</th>
                         <th>Parts</th>
+                        <th>Manufacturer</th>
+                        <th>Location</th>
                         <th>Difficulty</th>
+                        <th>FIL Rate</th>
+                        <th>POL Rate</th>
+                        <th>PRP Rate</th>
+                        <th>Dhaga Rate</th>
+                        <th>Client Code</th>
+                        <th>Category</th>
+                        <th>TP RM Ctg</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loadState.products.map((product) => (
                         <tr key={product.id}>
+                          <td>
+                            {product.imageUrl ? (
+                              <img
+                                src={product.imageUrl}
+                                alt={product.designCode}
+                                style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "4px" }}
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  target.style.display = "none";
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    const fallback = document.createElement("span");
+                                    fallback.style.color = "#a0aec0";
+                                    fallback.style.fontSize = "0.875rem";
+                                    fallback.textContent = "No image found";
+                                    parent.appendChild(fallback);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span style={{ color: "#a0aec0", fontSize: "0.875rem" }}>No image found</span>
+                            )}
+                          </td>
                           <td>{product.designCode}</td>
                           <td>{product.managerName}</td>
-                          <td>{product.custCode}</td>
-                          <td>{product.manufacturer}</td>
+                          <td>{product.custType}</td>
                           <td>{product.numberOfParts}</td>
+                          <td>{product.manufacturer}</td>
+                          <td>{product.dep}</td>
                           <td>{product.difficulty}</td>
+                          <td>{inr(product.filRate)}</td>
+                          <td>{inr(product.polRate)}</td>
+                          <td>{inr(product.prpRate)}</td>
+                          <td>{inr(product.dhagaRate)}</td>
+                          <td>{product.custCode}</td>
+                          <td>{product.polCtg}</td>
+                          <td>{product.tpRmCtg || "—"}</td>
                         </tr>
                       ))}
                     </tbody>

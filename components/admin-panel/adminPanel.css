@@ -145,6 +145,93 @@
   color: #1a202c;
 }
 
+.admin-date-filters {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.admin-date-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  max-width: 200px;
+}
+
+.admin-date-filter span {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-date-filter input[type="date"] {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #2d3748;
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 44px;
+}
+
+.admin-date-filter input[type="date"]:hover {
+  border-color: #cbd5e0;
+  background: white;
+}
+
+.admin-date-filter input[type="date"]:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.admin-date-filter input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.5);
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.admin-date-filter input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.admin-fetch-btn {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-fetch-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.admin-fetch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .admin-placeholder {
   padding: 3rem 2rem;
   background: white;
@@ -154,4 +241,50 @@
   color: #718096;
   font-size: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.admin-placeholder--error {
+  border-color: #fc8181;
+  color: #c53030;
+  background: #fff5f5;
+}
+
+.admin-designs-table {
+  background: white;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th {
+  padding: 1rem;
+  background: #f7fafc;
+  font-weight: 600;
+  color: #2d3748;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #4a5568;
+  font-size: 0.95rem;
+}
+
+.admin-table tbody tr:hover {
+  background: #f7fafc;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
 }
