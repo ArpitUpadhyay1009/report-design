@@ -5,6 +5,7 @@ import type { Profile } from "@/types/profile";
 import type { Product } from "@/types/product";
 import { fetchDesignApprovals } from "@/services/api";
 import "./adminPanel.css";
+import "./adminPanel-responsive.css";
 
 interface AdminPanelProps {
   user: Profile;
@@ -37,10 +38,13 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     message?: string;
     products?: Product[];
   }>({ status: "idle" });
+  const [visibleCount, setVisibleCount] = useState(10);
+  const PAGE_SIZE = 10;
 
   const handleFetchDesigns = useCallback(async () => {
     if (!fromDate || !toDate || fromDate > toDate) return;
     setLoadState({ status: "loading" });
+    setVisibleCount(10); // Reset pagination
     try {
       const products = await fetchDesignApprovals({
         fromDate,
@@ -53,6 +57,10 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       setLoadState({ status: "error", message });
     }
   }, [fromDate, toDate, user.empRoleId]);
+
+  const handleShowMore = () => {
+    setVisibleCount(prev => prev + PAGE_SIZE);
+  };
 
   // Auto-fetch when both dates are selected and valid
   useEffect(() => {
@@ -169,73 +177,85 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               )}
               {loadState.status === "success" && loadState.products && (
                 <div className="admin-designs-table">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Image</th>
-                        <th>Design</th>
-                        <th>Manager</th>
-                        <th>Cust Type</th>
-                        <th>Parts</th>
-                        <th>Manufacturer</th>
-                        <th>Location</th>
-                        <th>Difficulty</th>
-                        <th>FIL Rate</th>
-                        <th>POL Rate</th>
-                        <th>PRP Rate</th>
-                        <th>Dhaga Rate</th>
-                        <th>Client Code</th>
-                        <th>Category</th>
-                        <th>TP RM Ctg</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadState.products.map((product) => (
-                        <tr key={product.id}>
-                          <td>
-                            {product.imageUrl ? (
-                              <img
-                                src={product.imageUrl}
-                                alt={product.designCode}
-                                style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "4px" }}
-                                onError={(e) => {
-                                  const target = e.currentTarget;
-                                  target.style.display = "none";
-                                  const parent = target.parentElement;
-                                  if (parent) {
-                                    const fallback = document.createElement("span");
-                                    fallback.style.color = "#a0aec0";
-                                    fallback.style.fontSize = "0.875rem";
-                                    fallback.textContent = "No image found";
-                                    parent.appendChild(fallback);
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <span style={{ color: "#a0aec0", fontSize: "0.875rem" }}>No image found</span>
-                            )}
-                          </td>
-                          <td>{product.designCode}</td>
-                          <td>{product.managerName}</td>
-                          <td>{product.custType}</td>
-                          <td>{product.numberOfParts}</td>
-                          <td>{product.manufacturer}</td>
-                          <td>{product.dep}</td>
-                          <td>{product.difficulty}</td>
-                          <td>{inr(product.filRate)}</td>
-                          <td>{inr(product.polRate)}</td>
-                          <td>{inr(product.prpRate)}</td>
-                          <td>{inr(product.dhagaRate)}</td>
-                          <td>{product.custCode}</td>
-                          <td>{product.polCtg}</td>
-                          <td>{product.tpRmCtg || "—"}</td>
+                  <div className="admin-table-wrapper">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Image</th>
+                          <th>Design</th>
+                          <th>Manager</th>
+                          <th>Cust Type</th>
+                          <th>Parts</th>
+                          <th>Manufacturer</th>
+                          <th>Location</th>
+                          <th>Difficulty</th>
+                          <th>FIL Rate</th>
+                          <th>POL Rate</th>
+                          <th>PRP Rate</th>
+                          <th>Dhaga Rate</th>
+                          <th>Client Code</th>
+                          <th>Category</th>
+                          <th>TP RM Ctg</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {loadState.products.slice(0, visibleCount).map((product) => (
+                          <tr key={product.id}>
+                            <td>
+                              {product.imageUrl ? (
+                                <img
+                                  src={product.imageUrl}
+                                  alt={product.designCode}
+                                  style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "4px" }}
+                                  onError={(e) => {
+                                    const target = e.currentTarget;
+                                    target.style.display = "none";
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      const fallback = document.createElement("span");
+                                      fallback.style.color = "#a0aec0";
+                                      fallback.style.fontSize = "0.875rem";
+                                      fallback.textContent = "No image found";
+                                      parent.appendChild(fallback);
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <span style={{ color: "#a0aec0", fontSize: "0.875rem" }}>No image found</span>
+                              )}
+                            </td>
+                            <td>{product.designCode}</td>
+                            <td>{product.managerName}</td>
+                            <td>{product.custType}</td>
+                            <td>{product.numberOfParts}</td>
+                            <td>{product.manufacturer}</td>
+                            <td>{product.dep}</td>
+                            <td>{product.difficulty}</td>
+                            <td>{inr(product.filRate)}</td>
+                            <td>{inr(product.polRate)}</td>
+                            <td>{inr(product.prpRate)}</td>
+                            <td>{inr(product.dhagaRate)}</td>
+                            <td>{product.custCode}</td>
+                            <td>{product.polCtg}</td>
+                            <td>{product.tpRmCtg || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   {loadState.products.length === 0 && (
                     <div className="admin-placeholder">
                       <p>No designs found for the selected date range.</p>
+                    </div>
+                  )}
+                  {loadState.products.length > visibleCount && (
+                    <div className="admin-show-more">
+                      <button className="admin-show-more-btn" onClick={handleShowMore}>
+                        Show {Math.min(PAGE_SIZE, loadState.products.length - visibleCount)} more
+                        <span className="admin-show-more-count">
+                          ({loadState.products.length - visibleCount} remaining)
+                        </span>
+                      </button>
                     </div>
                   )}
                 </div>

@@ -1,0 +1,27 @@
+/* Responsive styles for admin dashboard table */
+
+.admin-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+  min-width: 800px;
+}
+
+@media (max-width: 768px) {
+  .admin-table-wrapper {
+    margin: 0 -1rem;
+    padding: 0 1rem;
+  }
+  
+  .admin-table th,
+  .admin-table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .admin-table th {
+    font-size: 0.75rem;
+  }
+}
