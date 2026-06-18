@@ -1280,10 +1280,19 @@ export default function ProductsReport({
                           <th>Diff</th>
                           <th>FIL rate</th>
                         </>
+                      ) : user.role === "POL" ? (
+                        <>
+                          <th />
+                          <th />
+                          <th />
+                          <th>Diff</th>
+                          <th>POL</th>
+                          <th>PRP</th>
+                        </>
                       ) : (
                         <>
                           <th>Diff</th>
-                          {user.role !== "POL" ? <th>FIL</th> : null}
+                          <th>FIL</th>
                           <th>POL</th>
                           <th>PRP</th>
                         </>
