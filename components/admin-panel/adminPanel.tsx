@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Profile } from "@/types/profile";
 import type { Product } from "@/types/product";
-import { fetchDesignApprovals } from "@/services/api";
+import { fetchDesignApprovals, fetchCompletedFilDesignIds } from "@/services/api";
 import "./adminPanel.css";
 import "./adminPanel-responsive.css";
 import "./adminPanel-header.css";
+import "./adminPanel-status.css";
 
 interface AdminPanelProps {
   user: Profile;
@@ -41,6 +42,11 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   }>({ status: "idle" });
   const [visibleCount, setVisibleCount] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filEntries, setFilEntries] = useState<{
+    status: "idle" | "loading" | "success" | "error";
+    message?: string;
+    designIds?: string[];
+  }>({ status: "idle" });
   const PAGE_SIZE = 10;
 
   const handleFetchDesigns = useCallback(async () => {
@@ -64,6 +70,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
     setVisibleCount(prev => prev + PAGE_SIZE);
   };
 
+  const handleFetchFilEntries = useCallback(async () => {
+    setFilEntries({ status: "loading" });
+    try {
+      const designIds = await fetchCompletedFilDesignIds();
+      setFilEntries({ status: "success", designIds });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to fetch FIL entries.";
+      setFilEntries({ status: "error", message });
+    }
+  }, []);
+
   const filteredProducts = useMemo(() => {
     const products = loadState.products ?? [];
     if (!searchQuery.trim()) return products;
@@ -83,6 +100,13 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       handleFetchDesigns();
     }
   }, [fromDate, toDate, handleFetchDesigns]);
+
+  // Fetch FIL entries when tab is active
+  useEffect(() => {
+    if (activeTab === "fil-entries" && filEntries.status === "idle") {
+      handleFetchFilEntries();
+    }
+  }, [activeTab, filEntries.status, handleFetchFilEntries]);
 
   return (
     <div className="admin-panel">
@@ -292,9 +316,53 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {activeTab === "fil-entries" && (
             <section className="admin-section">
               <h2 className="admin-section-title">FIL entries</h2>
-              <div className="admin-placeholder">
-                <p>Review and manage FIL rate entries</p>
-              </div>
+              {filEntries.status === "idle" && (
+                <div className="admin-placeholder">
+                  <p>Loading FIL entries...</p>
+                </div>
+              )}
+              {filEntries.status === "loading" && (
+                <div className="admin-placeholder">
+                  <p>Loading FIL entries...</p>
+                </div>
+              )}
+              {filEntries.status === "error" && (
+                <div className="admin-placeholder admin-placeholder--error">
+                  <p>Error: {filEntries.message}</p>
+                  <button onClick={handleFetchFilEntries}>Retry</button>
+                </div>
+              )}
+              {filEntries.status === "success" && filEntries.designIds && (
+                <div className="admin-designs-table">
+                  <div className="admin-table-wrapper">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Design ID</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filEntries.designIds.map((designId, index) => (
+                          <tr key={designId}>
+                            <td>{designId}</td>
+                            <td>
+                              <span className="admin-status-badge admin-status-badge--success">
+                                FIL Completed
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {filEntries.designIds.length === 0 && (
+                    <div className="admin-placeholder">
+                      <p>No FIL entries found.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
