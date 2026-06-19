@@ -128,6 +128,10 @@ const handleExportManagerEntries = (rows: {
   managerPolRate: number | null;
   managerPrpRate: number | null;
   managerDhagaRate: number | null;
+  filUserFilRate: number | null;
+  filUserPrpRate: number | null;
+  polUserPolRate: number | null;
+  polUserPrpRate: number | null;
   managerStatus: string;
   managerSubmittedAt: string;
 }[]) => {
@@ -192,6 +196,10 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       managerPolRate: number | null;
       managerPrpRate: number | null;
       managerDhagaRate: number | null;
+      filUserFilRate: number | null;
+      filUserPrpRate: number | null;
+      polUserPolRate: number | null;
+      polUserPrpRate: number | null;
       managerStatus: string;
       managerSubmittedAt: string;
     }[];
@@ -321,8 +329,8 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       const empUniqId = managerToEmpUniqId[selectedManager];
       if (!empUniqId) throw new Error("Manager not found in mapping.");
 
-      // Call both APIs in parallel
-      const [managerRates, systemProducts] = await Promise.all([
+      // Call all APIs in parallel
+      const [managerRates, systemProducts, filData, polData] = await Promise.all([
         fetchManagerRatesByUser(empUniqId),
         fetchDesignApprovals({
           fromDate: managerFromDate,
@@ -330,17 +338,33 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           roleId: "4",
           managerName: selectedManager,
         }),
+        fetchFilForAdmin(),
+        fetchPolForAdmin(),
       ]);
 
-      // Build lookup map from system products by designCode
+      // Build lookup maps
       const systemMap = new Map<string, typeof systemProducts[0]>();
       for (const p of systemProducts) {
         systemMap.set(p.designCode.trim(), p);
       }
 
-      // Merge: one row per manager rate entry
+      const filMap = new Map<string, typeof filData[0]>();
+      for (const f of filData) {
+        filMap.set((f.design_id ?? "").trim(), f);
+      }
+
+      const polMap = new Map<string, typeof polData[0]>();
+      for (const p of polData) {
+        polMap.set((p.design_id ?? "").trim(), p);
+      }
+
+      // Merge: one row per manager rate entry, include FIL and POL rates for common design codes
       const rows = managerRates.map(rate => {
-        const sysProduct = systemMap.get((rate.design_id ?? "").trim());
+        const designId = (rate.design_id ?? "").trim();
+        const sysProduct = systemMap.get(designId);
+        const filRate = filMap.get(designId);
+        const polRate = polMap.get(designId);
+
         return {
           designId: rate.design_id ?? "",
           managerName: sysProduct?.managerName ?? selectedManager,
@@ -353,6 +377,10 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           managerPolRate: rate.pol_rate != null ? Number(rate.pol_rate) : null,
           managerPrpRate: rate.prp_rate != null ? Number(rate.prp_rate) : null,
           managerDhagaRate: rate.dhaga_rate != null ? Number(rate.dhaga_rate) : null,
+          filUserFilRate: filRate?.fil_rate != null ? Number(filRate.fil_rate) : null,
+          filUserPrpRate: filRate?.prp_rate != null ? Number(filRate.prp_rate) : null,
+          polUserPolRate: polRate?.pol_rate != null ? Number(polRate.pol_rate) : null,
+          polUserPrpRate: polRate?.prp_rate != null ? Number(polRate.prp_rate) : null,
           managerStatus: rate.manager_status ?? "",
           managerSubmittedAt: rate.manager_submitted_at ?? "",
         };
@@ -913,7 +941,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                           <th rowSpan={2}>Design ID</th>
                           <th rowSpan={2}>Difficulty</th>
                           <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
-                          <th colSpan={4} style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>Manager Rates</th>
+                          <th colSpan={3} style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>Manager Rates</th>
+                          <th style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>FIL User Rate</th>
+                          <th colSpan={2} style={{ textAlign: "center", background: "#fdf2f8", color: "#97266d" }}>POL User Rates</th>
                           <th rowSpan={2}>Status</th>
                           <th rowSpan={2}>Submitted At</th>
                         </tr>
@@ -925,7 +955,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                           <th style={{ background: "#f0fff4" }}>Mgr FIL</th>
                           <th style={{ background: "#f0fff4" }}>Mgr POL</th>
                           <th style={{ background: "#f0fff4" }}>Mgr PRP</th>
-                          <th style={{ background: "#f0fff4" }}>Mgr Dhaga</th>
+                          <th style={{ background: "#f0fff4" }}>FIL</th>
+                          <th style={{ background: "#fdf2f8" }}>POL</th>
+                          <th style={{ background: "#fdf2f8" }}>PRP</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -940,7 +972,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{row.managerFilRate != null ? inr(row.managerFilRate) : "—"}</td>
                             <td>{row.managerPolRate != null ? inr(row.managerPolRate) : "—"}</td>
                             <td>{row.managerPrpRate != null ? inr(row.managerPrpRate) : "—"}</td>
-                            <td>{row.managerDhagaRate != null ? inr(row.managerDhagaRate) : "—"}</td>
+                            <td>{row.filUserFilRate != null ? inr(row.filUserFilRate) : "—"}</td>
+                            <td>{row.polUserPolRate != null ? inr(row.polUserPolRate) : "—"}</td>
+                            <td>{row.polUserPrpRate != null ? inr(row.polUserPrpRate) : "—"}</td>
                             <td><span className="admin-status-badge admin-status-badge--success">{row.managerStatus}</span></td>
                             <td>{row.managerSubmittedAt ? new Date(row.managerSubmittedAt).toLocaleString() : "—"}</td>
                           </tr>
