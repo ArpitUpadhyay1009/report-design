@@ -731,7 +731,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                 )}
                 {filEntries.status === "success" && filEntries.rows && filEntries.rows.length > 0 && (
                   <div className="admin-toolbar-export">
-                    <button className="admin-export-btn" onClick={() => handleExportFilEntries(filEntries.rows!)}>📊 Export to Excel</button>
+                    <button className="admin-export-btn" onClick={() => handleExportFilEntries(filEntries.rows!.filter(r => r.status === "COMPLETED"))}>📊 Export to Excel</button>
                   </div>
                 )}
               </div>
@@ -821,7 +821,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                 )}
                 {polEntries.status === "success" && polEntries.rows && polEntries.rows.length > 0 && (
                   <div className="admin-toolbar-export">
-                    <button className="admin-export-btn" onClick={() => handleExportPolEntries(polEntries.rows!)}>📊 Export to Excel</button>
+                    <button className="admin-export-btn" onClick={() => handleExportPolEntries(polEntries.rows!.filter(r => r.status === "COMPLETED"))}>📊 Export to Excel</button>
                   </div>
                 )}
               </div>
@@ -927,25 +927,11 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               </div>
               {managerEntries.status === "success" && managerEntries.rows && (
                 <div className="admin-summary">
-                  <div className="admin-summary-card admin-summary-card--total">
-                    <span className="admin-summary-icon">📋</span>
-                    <div className="admin-summary-info">
-                      <span className="admin-summary-value">{(loadState.products ?? []).length}</span>
-                      <span className="admin-summary-label">Total Designs</span>
-                    </div>
-                  </div>
-                  <div className="admin-summary-card admin-summary-card--completed">
-                    <span className="admin-summary-icon">✅</span>
-                    <div className="admin-summary-info">
-                      <span className="admin-summary-value">{managerEntries.rows.length}</span>
-                      <span className="admin-summary-label">Mgr Completed</span>
-                    </div>
-                  </div>
                   <div className="admin-summary-card admin-summary-card--pending">
                     <span className="admin-summary-icon">⏳</span>
                     <div className="admin-summary-info">
                       <span className="admin-summary-value">{Math.max(0, (loadState.products ?? []).length - managerEntries.rows.length)}</span>
-                      <span className="admin-summary-label">Pending</span>
+                      <span className="admin-summary-label">Pending Manager</span>
                     </div>
                   </div>
                 </div>
