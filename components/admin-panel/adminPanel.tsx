@@ -338,8 +338,29 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
         fetchPolForAdmin(),
         fetchDesignApprovals({ fromDate: polFromDate, toDate: polToDate, roleId: user.empRoleId }),
       ]);
-      const rows = mergeRatesWithSystem(polRates, systemProducts, "pol");
-      setPolEntries({ status: "success", rows });
+      // Completed POL entries
+      const completedRows = mergeRatesWithSystem(polRates, systemProducts, "pol");
+
+      // Pending: system designs that don't have a POL entry yet
+      const polDesignIds = new Set(polRates.map(r => (r.design_id ?? "").trim()));
+      const pendingRows: FilPolMergedRow[] = systemProducts
+        .filter(p => !polDesignIds.has(p.designCode.trim()))
+        .map(p => ({
+          designId: p.designCode,
+          difficulty: p.difficulty ?? "",
+          systemFilRate: p.filRate ?? 0,
+          systemPolRate: p.polRate ?? 0,
+          systemPrpRate: p.prpRate ?? 0,
+          systemDhagaRate: p.dhagaRate ?? 0,
+          userFilRate: null,
+          userPolRate: null,
+          userPrpRate: null,
+          userDhagaRate: null,
+          status: "PENDING",
+          submittedAt: "",
+        }));
+
+      setPolEntries({ status: "success", rows: [...completedRows, ...pendingRows] });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to fetch POL entries.";
       setPolEntries({ status: "error", message });
@@ -806,25 +827,11 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               </div>
               {polEntries.status === "success" && polEntries.rows && (
                 <div className="admin-summary">
-                  <div className="admin-summary-card admin-summary-card--total">
-                    <span className="admin-summary-icon">📋</span>
-                    <div className="admin-summary-info">
-                      <span className="admin-summary-value">{(loadState.products ?? []).length}</span>
-                      <span className="admin-summary-label">Total Designs</span>
-                    </div>
-                  </div>
-                  <div className="admin-summary-card admin-summary-card--completed">
-                    <span className="admin-summary-icon">✅</span>
-                    <div className="admin-summary-info">
-                      <span className="admin-summary-value">{polEntries.rows.length}</span>
-                      <span className="admin-summary-label">POL Completed</span>
-                    </div>
-                  </div>
                   <div className="admin-summary-card admin-summary-card--pending">
                     <span className="admin-summary-icon">⏳</span>
                     <div className="admin-summary-info">
-                      <span className="admin-summary-value">{Math.max(0, (loadState.products ?? []).length - polEntries.rows.length)}</span>
-                      <span className="admin-summary-label">Pending</span>
+                      <span className="admin-summary-value">{polEntries.rows.filter(r => r.status === "PENDING").length}</span>
+                      <span className="admin-summary-label">Pending POL</span>
                     </div>
                   </div>
                 </div>
@@ -869,7 +876,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{inr(row.systemDhagaRate)}</td>
                             <td>{row.userPolRate != null ? inr(row.userPolRate) : "—"}</td>
                             <td>{row.userPrpRate != null ? inr(row.userPrpRate) : "—"}</td>
-                            <td><span className="admin-status-badge admin-status-badge--success">{row.status}</span></td>
+                            <td><span className={`admin-status-badge ${row.status === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.status}</span></td>
                             <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
