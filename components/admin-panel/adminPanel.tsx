@@ -137,8 +137,8 @@ const handleExportManagerEntries = (rows: {
 }[]) => {
   const data = rows.map(row => ({
     'Design ID': row.designId,
+    'Manager Name': row.managerName,
     'Difficulty': row.difficulty,
-    'FIL Rate': row.filRate,
     'System FIL Rate': row.filRate,
     'System POL Rate': row.polRate,
     'System PRP Rate': row.prpRate,
@@ -146,7 +146,9 @@ const handleExportManagerEntries = (rows: {
     'Manager FIL Rate': row.managerFilRate ?? '',
     'Manager POL Rate': row.managerPolRate ?? '',
     'Manager PRP Rate': row.managerPrpRate ?? '',
-    'Manager Dhaga Rate': row.managerDhagaRate ?? '',
+    'FIL User FIL Rate': row.filUserFilRate ?? '',
+    'POL User POL Rate': row.polUserPolRate ?? '',
+    'POL User PRP Rate': row.polUserPrpRate ?? '',
     'Status': row.managerStatus,
     'Submitted At': row.managerSubmittedAt,
   }));
@@ -212,6 +214,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   const [managerSearchQuery, setManagerSearchQuery] = useState("");
 
   const managerNames = [
+    "All Managers",
     "KIRAN NANJI VIRAS",
     "BHAVIN KISHAN GORADIA",
     "HARDIK KAPADIA",
@@ -221,6 +224,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
   ];
 
   const managerToEmpUniqId: Record<string, string> = {
+    "All Managers": "ALL MANAGERS",
     "KIRAN NANJI VIRAS": "5",
     "BHAVIN KISHAN GORADIA": "322024",
     "HARDIK KAPADIA": "324415",
@@ -329,14 +333,16 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       const empUniqId = managerToEmpUniqId[selectedManager];
       if (!empUniqId) throw new Error("Manager not found in mapping.");
 
+      const isAllManagers = selectedManager === "All Managers";
+
       // Call all APIs in parallel
       const [managerRates, systemProducts, filData, polData] = await Promise.all([
         fetchManagerRatesByUser(empUniqId),
         fetchDesignApprovals({
           fromDate: managerFromDate,
           toDate: managerToDate,
-          roleId: "4",
-          managerName: selectedManager,
+          roleId: "5",
+          ...(isAllManagers ? {} : { managerName: selectedManager }),
         }),
         fetchFilForAdmin(),
         fetchPolForAdmin(),
@@ -358,16 +364,25 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
         polMap.set((p.design_id ?? "").trim(), p);
       }
 
+      // Build reverse lookup: empUniqId -> manager name
+      const empIdToManager: Record<string, string> = {};
+      for (const [name, id] of Object.entries(managerToEmpUniqId)) {
+        if (name !== "All Managers") empIdToManager[id] = name;
+      }
+
       // Merge: one row per manager rate entry, include FIL and POL rates for common design codes
       const rows = managerRates.map(rate => {
         const designId = (rate.design_id ?? "").trim();
         const sysProduct = systemMap.get(designId);
         const filRate = filMap.get(designId);
         const polRate = polMap.get(designId);
+        const resolvedManagerName = isAllManagers
+          ? (sysProduct?.managerName ?? empIdToManager[rate.manager_user_id ?? ""] ?? "Unknown")
+          : selectedManager;
 
         return {
           designId: rate.design_id ?? "",
-          managerName: sysProduct?.managerName ?? selectedManager,
+          managerName: resolvedManagerName,
           difficulty: sysProduct?.difficulty ?? "",
           filRate: sysProduct?.filRate ?? 0,
           polRate: sysProduct?.polRate ?? 0,
@@ -939,6 +954,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                       <thead>
                         <tr>
                           <th rowSpan={2}>Design ID</th>
+                          {selectedManager === "All Managers" && <th rowSpan={2}>Manager</th>}
                           <th rowSpan={2}>Difficulty</th>
                           <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
                           <th colSpan={3} style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>Manager Rates</th>
@@ -964,6 +980,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                         {filteredManagerEntries.slice(0, managerVisibleCount).map((row, idx) => (
                           <tr key={`${row.designId}-${idx}`}>
                             <td>{row.designId}</td>
+                            {selectedManager === "All Managers" && <td>{row.managerName}</td>}
                             <td>{row.difficulty || "—"}</td>
                             <td>{inr(row.filRate)}</td>
                             <td>{inr(row.polRate)}</td>
