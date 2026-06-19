@@ -12,6 +12,7 @@ import "./adminPanel-header.css";
 import "./adminPanel-status.css";
 import "./adminPanel-manager.css";
 import "./adminPanel-export.css";
+import "./adminPanel-summary.css";
 
 interface AdminPanelProps {
   user: Profile;
@@ -504,45 +505,27 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {/* All designs Tab */}
           {activeTab === "all-designs" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">All designs</h2>
-              <div className="admin-date-filters">
-                <label className="admin-date-filter">
-                  <span>From date</span>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    max={toDate}
-                  />
-                </label>
-                <label className="admin-date-filter">
-                  <span>To date</span>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    min={fromDate}
-                  />
-                </label>
-                <div className="admin-date-filter admin-date-filter--search">
-                  <span>Search</span>
-                  <input
-                    type="text"
-                    placeholder="Search designs..."
-                    className="admin-search-bar-input"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+              <div className="admin-toolbar">
+                <label>From <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} max={toDate} /></label>
+                <label>To <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} min={fromDate} /></label>
+                <div className="admin-toolbar-search">
+                  <input type="text" placeholder="Search designs..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
+                {loadState.status === "success" && loadState.products && loadState.products.length > 0 && (
+                  <div className="admin-toolbar-export">
+                    <button className="admin-export-btn" onClick={() => handleExportAllDesigns(loadState.products!)}>📊 Export to Excel</button>
+                  </div>
+                )}
               </div>
-              {loadState.status === "success" && loadState.products && loadState.products.length > 0 && (
-                <div className="admin-export">
-                  <button
-                    className="admin-export-btn"
-                    onClick={() => handleExportAllDesigns(loadState.products!)}
-                  >
-                    📊 Export to Excel
-                  </button>
+              {loadState.status === "success" && loadState.products && (
+                <div className="admin-summary">
+                  <div className="admin-summary-card admin-summary-card--total">
+                    <span className="admin-summary-icon">📋</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{loadState.products.length}</span>
+                      <span className="admin-summary-label">Total Designs</span>
+                    </div>
+                  </div>
                 </div>
               )}
               {loadState.status === "idle" && (
@@ -652,28 +635,43 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {/* FIL entries Tab */}
           {activeTab === "fil-entries" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">FIL entries</h2>
-              <div className="admin-date-filters">
-                <label className="admin-date-filter">
-                  <span>From date</span>
-                  <input type="date" value={filFromDate} onChange={(e) => setFilFromDate(e.target.value)} max={filToDate} />
-                </label>
-                <label className="admin-date-filter">
-                  <span>To date</span>
-                  <input type="date" value={filToDate} onChange={(e) => setFilToDate(e.target.value)} min={filFromDate} />
-                </label>
+              <div className="admin-toolbar">
+                <label>From <input type="date" value={filFromDate} onChange={(e) => setFilFromDate(e.target.value)} max={filToDate} /></label>
+                <label>To <input type="date" value={filToDate} onChange={(e) => setFilToDate(e.target.value)} min={filFromDate} /></label>
+                {filEntries.status === "success" && filEntries.rows && (
+                  <div className="admin-toolbar-search">
+                    <input type="text" placeholder="Search designs..." value={filSearchQuery} onChange={(e) => setFilSearchQuery(e.target.value)} />
+                  </div>
+                )}
+                {filEntries.status === "success" && filEntries.rows && filEntries.rows.length > 0 && (
+                  <div className="admin-toolbar-export">
+                    <button className="admin-export-btn" onClick={() => handleExportFilEntries(filEntries.rows!)}>📊 Export to Excel</button>
+                  </div>
+                )}
               </div>
               {filEntries.status === "success" && filEntries.rows && (
-                <div className="admin-date-filters">
-                  <div className="admin-date-filter admin-date-filter--search">
-                    <span>Search</span>
-                    <input type="text" placeholder="Search designs..." className="admin-search-bar-input" value={filSearchQuery} onChange={(e) => setFilSearchQuery(e.target.value)} />
+                <div className="admin-summary">
+                  <div className="admin-summary-card admin-summary-card--total">
+                    <span className="admin-summary-icon">📋</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{(loadState.products ?? []).length}</span>
+                      <span className="admin-summary-label">Total Designs</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {filEntries.status === "success" && filEntries.rows && filEntries.rows.length > 0 && (
-                <div className="admin-export">
-                  <button className="admin-export-btn" onClick={() => handleExportFilEntries(filEntries.rows!)}>📊 Export to Excel</button>
+                  <div className="admin-summary-card admin-summary-card--completed">
+                    <span className="admin-summary-icon">✅</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{filEntries.rows.length}</span>
+                      <span className="admin-summary-label">FIL Completed</span>
+                    </div>
+                  </div>
+                  <div className="admin-summary-card admin-summary-card--pending">
+                    <span className="admin-summary-icon">⏳</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{Math.max(0, (loadState.products ?? []).length - filEntries.rows.length)}</span>
+                      <span className="admin-summary-label">Pending</span>
+                    </div>
+                  </div>
                 </div>
               )}
               {filEntries.status === "loading" ? (
@@ -686,7 +684,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               ) : filEntries.status === "success" && filEntries.rows ? (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
-                    <table className="admin-table">
+                    <table className="admin-table admin-table--compact">
                       <thead>
                         <tr>
                           <th rowSpan={2}>Design ID</th>
@@ -720,9 +718,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{row.userPolRate != null ? inr(row.userPolRate) : "—"}</td>
                             <td>{row.userPrpRate != null ? inr(row.userPrpRate) : "—"}</td>
                             <td>{row.userDhagaRate != null ? inr(row.userDhagaRate) : "—"}</td>
-                            <td>
-                              <span className="admin-status-badge admin-status-badge--success">{row.status}</span>
-                            </td>
+                            <td><span className="admin-status-badge admin-status-badge--success">{row.status}</span></td>
                             <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
@@ -750,28 +746,43 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {/* POL entries Tab */}
           {activeTab === "pol-entries" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">POL entries</h2>
-              <div className="admin-date-filters">
-                <label className="admin-date-filter">
-                  <span>From date</span>
-                  <input type="date" value={polFromDate} onChange={(e) => setPolFromDate(e.target.value)} max={polToDate} />
-                </label>
-                <label className="admin-date-filter">
-                  <span>To date</span>
-                  <input type="date" value={polToDate} onChange={(e) => setPolToDate(e.target.value)} min={polFromDate} />
-                </label>
+              <div className="admin-toolbar">
+                <label>From <input type="date" value={polFromDate} onChange={(e) => setPolFromDate(e.target.value)} max={polToDate} /></label>
+                <label>To <input type="date" value={polToDate} onChange={(e) => setPolToDate(e.target.value)} min={polFromDate} /></label>
+                {polEntries.status === "success" && polEntries.rows && (
+                  <div className="admin-toolbar-search">
+                    <input type="text" placeholder="Search designs..." value={polSearchQuery} onChange={(e) => setPolSearchQuery(e.target.value)} />
+                  </div>
+                )}
+                {polEntries.status === "success" && polEntries.rows && polEntries.rows.length > 0 && (
+                  <div className="admin-toolbar-export">
+                    <button className="admin-export-btn" onClick={() => handleExportPolEntries(polEntries.rows!)}>📊 Export to Excel</button>
+                  </div>
+                )}
               </div>
               {polEntries.status === "success" && polEntries.rows && (
-                <div className="admin-date-filters">
-                  <div className="admin-date-filter admin-date-filter--search">
-                    <span>Search</span>
-                    <input type="text" placeholder="Search designs..." className="admin-search-bar-input" value={polSearchQuery} onChange={(e) => setPolSearchQuery(e.target.value)} />
+                <div className="admin-summary">
+                  <div className="admin-summary-card admin-summary-card--total">
+                    <span className="admin-summary-icon">📋</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{(loadState.products ?? []).length}</span>
+                      <span className="admin-summary-label">Total Designs</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {polEntries.status === "success" && polEntries.rows && polEntries.rows.length > 0 && (
-                <div className="admin-export">
-                  <button className="admin-export-btn" onClick={() => handleExportPolEntries(polEntries.rows!)}>📊 Export to Excel</button>
+                  <div className="admin-summary-card admin-summary-card--completed">
+                    <span className="admin-summary-icon">✅</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{polEntries.rows.length}</span>
+                      <span className="admin-summary-label">POL Completed</span>
+                    </div>
+                  </div>
+                  <div className="admin-summary-card admin-summary-card--pending">
+                    <span className="admin-summary-icon">⏳</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{Math.max(0, (loadState.products ?? []).length - polEntries.rows.length)}</span>
+                      <span className="admin-summary-label">Pending</span>
+                    </div>
+                  </div>
                 </div>
               )}
               {polEntries.status === "loading" ? (
@@ -784,7 +795,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               ) : polEntries.status === "success" && polEntries.rows ? (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
-                    <table className="admin-table">
+                    <table className="admin-table admin-table--compact">
                       <thead>
                         <tr>
                           <th rowSpan={2}>Design ID</th>
@@ -818,9 +829,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{row.userPolRate != null ? inr(row.userPolRate) : "—"}</td>
                             <td>{row.userPrpRate != null ? inr(row.userPrpRate) : "—"}</td>
                             <td>{row.userDhagaRate != null ? inr(row.userDhagaRate) : "—"}</td>
-                            <td>
-                              <span className="admin-status-badge admin-status-badge--success">{row.status}</span>
-                            </td>
+                            <td><span className="admin-status-badge admin-status-badge--success">{row.status}</span></td>
                             <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
@@ -848,64 +857,50 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           {/* Manager entries Tab */}
           {activeTab === "manager-entries" && (
             <section className="admin-section">
-              <h2 className="admin-section-title">Manager entries</h2>
-              <div className="admin-date-filters">
-                <label className="admin-date-filter">
-                  <span>From date</span>
-                  <input
-                    type="date"
-                    value={managerFromDate}
-                    onChange={(e) => setManagerFromDate(e.target.value)}
-                    max={managerToDate}
-                  />
-                </label>
-                <label className="admin-date-filter">
-                  <span>To date</span>
-                  <input
-                    type="date"
-                    value={managerToDate}
-                    onChange={(e) => setManagerToDate(e.target.value)}
-                    min={managerFromDate}
-                  />
-                </label>
-                <div className="admin-date-filter">
-                  <span>Manager</span>
-                  <select
-                    className="admin-manager-select"
-                    value={selectedManager}
-                    onChange={(e) => setSelectedManager(e.target.value)}
-                  >
+              <div className="admin-toolbar">
+                <label>From <input type="date" value={managerFromDate} onChange={(e) => setManagerFromDate(e.target.value)} max={managerToDate} /></label>
+                <label>To <input type="date" value={managerToDate} onChange={(e) => setManagerToDate(e.target.value)} min={managerFromDate} /></label>
+                <div className="admin-toolbar-group">
+                  Manager
+                  <select value={selectedManager} onChange={(e) => setSelectedManager(e.target.value)}>
                     <option value="">Select manager...</option>
-                    {managerNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
+                    {managerNames.map((name) => (<option key={name} value={name}>{name}</option>))}
                   </select>
                 </div>
+                {managerEntries.status === "success" && managerEntries.rows && (
+                  <div className="admin-toolbar-search">
+                    <input type="text" placeholder="Search designs..." value={managerSearchQuery} onChange={(e) => setManagerSearchQuery(e.target.value)} />
+                  </div>
+                )}
+                {managerEntries.status === "success" && managerEntries.rows && managerEntries.rows.length > 0 && (
+                  <div className="admin-toolbar-export">
+                    <button className="admin-export-btn" onClick={() => handleExportManagerEntries(managerEntries.rows!)}>📊 Export to Excel</button>
+                  </div>
+                )}
               </div>
               {managerEntries.status === "success" && managerEntries.rows && (
-                <div className="admin-date-filters">
-                  <div className="admin-date-filter admin-date-filter--search">
-                    <span>Search</span>
-                    <input
-                      type="text"
-                      placeholder="Search designs..."
-                      className="admin-search-bar-input"
-                      value={managerSearchQuery}
-                      onChange={(e) => setManagerSearchQuery(e.target.value)}
-                    />
+                <div className="admin-summary">
+                  <div className="admin-summary-card admin-summary-card--total">
+                    <span className="admin-summary-icon">📋</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{(loadState.products ?? []).length}</span>
+                      <span className="admin-summary-label">Total Designs</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {managerEntries.status === "success" && managerEntries.rows && managerEntries.rows.length > 0 && (
-                <div className="admin-export">
-                  <button
-                    className="admin-export-btn"
-                    onClick={() => handleExportManagerEntries(managerEntries.rows!)}
-                  >
-                    📊 Export to Excel
-                  </button>
+                  <div className="admin-summary-card admin-summary-card--completed">
+                    <span className="admin-summary-icon">✅</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{managerEntries.rows.length}</span>
+                      <span className="admin-summary-label">Mgr Completed</span>
+                    </div>
+                  </div>
+                  <div className="admin-summary-card admin-summary-card--pending">
+                    <span className="admin-summary-icon">⏳</span>
+                    <div className="admin-summary-info">
+                      <span className="admin-summary-value">{Math.max(0, (loadState.products ?? []).length - managerEntries.rows.length)}</span>
+                      <span className="admin-summary-label">Pending</span>
+                    </div>
+                  </div>
                 </div>
               )}
               {!selectedManager || !managerFromDate || !managerToDate ? (
@@ -913,9 +908,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                   <p>Select date range and manager to automatically load entries.</p>
                 </div>
               ) : managerEntries.status === "loading" ? (
-                <div className="admin-placeholder">
-                  <p>Loading manager entries...</p>
-                </div>
+                <div className="admin-placeholder"><p>Loading manager entries...</p></div>
               ) : managerEntries.status === "error" ? (
                 <div className="admin-placeholder admin-placeholder--error">
                   <p>Error: {managerEntries.message}</p>
@@ -924,7 +917,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               ) : managerEntries.status === "success" && managerEntries.rows ? (
                 <div className="admin-designs-table">
                   <div className="admin-table-wrapper">
-                    <table className="admin-table">
+                    <table className="admin-table admin-table--compact">
                       <thead>
                         <tr>
                           <th rowSpan={2}>Design ID</th>
@@ -958,11 +951,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{row.managerPolRate != null ? inr(row.managerPolRate) : "—"}</td>
                             <td>{row.managerPrpRate != null ? inr(row.managerPrpRate) : "—"}</td>
                             <td>{row.managerDhagaRate != null ? inr(row.managerDhagaRate) : "—"}</td>
-                            <td>
-                              <span className="admin-status-badge admin-status-badge--success">
-                                {row.managerStatus}
-                              </span>
-                            </td>
+                            <td><span className="admin-status-badge admin-status-badge--success">{row.managerStatus}</span></td>
                             <td>{row.managerSubmittedAt ? new Date(row.managerSubmittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
@@ -978,9 +967,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                     <div className="admin-show-more">
                       <button className="admin-show-more-btn" onClick={handleShowMoreManager}>
                         Show {Math.min(PAGE_SIZE, filteredManagerEntries.length - managerVisibleCount)} more
-                        <span className="admin-show-more-count">
-                          ({filteredManagerEntries.length - managerVisibleCount} remaining)
-                        </span>
+                        <span className="admin-show-more-count">({filteredManagerEntries.length - managerVisibleCount} remaining)</span>
                       </button>
                     </div>
                   )}

@@ -82,7 +82,8 @@
 }
 
 .admin-sidebar {
-  width: 240px;
+  width: 180px;
+  min-width: 180px;
   background: white;
   border-right: 1px solid #e0e4e8;
   overflow-y: auto;
@@ -114,14 +115,14 @@
 .admin-nav-item:hover {
   background: #f0f4f8;
   color: #667eea;
-  padding-left: 1.75rem;
+  padding-left: 1.25rem;
 }
 
 .admin-nav-item--active {
   background: #eef2ff;
   color: #667eea;
   border-left: 3px solid #667eea;
-  padding-left: calc(1.5rem - 3px);
+  padding-left: calc(1rem - 3px);
 }
 
 .admin-nav-icon {
@@ -131,7 +132,7 @@
 .admin-content {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
+  padding: 1rem 1.25rem;
 }
 
 .admin-section {
