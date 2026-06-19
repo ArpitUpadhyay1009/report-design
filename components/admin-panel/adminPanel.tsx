@@ -276,7 +276,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
       const sys = systemMap.get((rate.design_id ?? "").trim());
       return {
         designId: rate.design_id ?? "",
-        difficulty: sys?.difficulty ?? "",
+        difficulty: sys?.difficulty ?? rate.difficulty ?? "",
         systemFilRate: sys?.filRate ?? 0,
         systemPolRate: sys?.polRate ?? 0,
         systemPrpRate: sys?.prpRate ?? 0,
@@ -300,8 +300,29 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
         fetchFilForAdmin(),
         fetchDesignApprovals({ fromDate: filFromDate, toDate: filToDate, roleId: user.empRoleId }),
       ]);
-      const rows = mergeRatesWithSystem(filRates, systemProducts, "fil");
-      setFilEntries({ status: "success", rows });
+      // Completed FIL entries
+      const completedRows = mergeRatesWithSystem(filRates, systemProducts, "fil");
+
+      // Pending: system designs that don't have a FIL entry yet
+      const filDesignIds = new Set(filRates.map(r => (r.design_id ?? "").trim()));
+      const pendingRows: FilPolMergedRow[] = systemProducts
+        .filter(p => !filDesignIds.has(p.designCode.trim()))
+        .map(p => ({
+          designId: p.designCode,
+          difficulty: p.difficulty ?? "",
+          systemFilRate: p.filRate ?? 0,
+          systemPolRate: p.polRate ?? 0,
+          systemPrpRate: p.prpRate ?? 0,
+          systemDhagaRate: p.dhagaRate ?? 0,
+          userFilRate: null,
+          userPolRate: null,
+          userPrpRate: null,
+          userDhagaRate: null,
+          status: "PENDING",
+          submittedAt: "",
+        }));
+
+      setFilEntries({ status: "success", rows: [...completedRows, ...pendingRows] });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to fetch FIL entries.";
       setFilEntries({ status: "error", message });
@@ -695,25 +716,11 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               </div>
               {filEntries.status === "success" && filEntries.rows && (
                 <div className="admin-summary">
-                  <div className="admin-summary-card admin-summary-card--total">
-                    <span className="admin-summary-icon">📋</span>
-                    <div className="admin-summary-info">
-                      <span className="admin-summary-value">{(loadState.products ?? []).length}</span>
-                      <span className="admin-summary-label">Total Designs</span>
-                    </div>
-                  </div>
-                  <div className="admin-summary-card admin-summary-card--completed">
-                    <span className="admin-summary-icon">✅</span>
-                    <div className="admin-summary-info">
-                      <span className="admin-summary-value">{filEntries.rows.length}</span>
-                      <span className="admin-summary-label">FIL Completed</span>
-                    </div>
-                  </div>
                   <div className="admin-summary-card admin-summary-card--pending">
                     <span className="admin-summary-icon">⏳</span>
                     <div className="admin-summary-info">
-                      <span className="admin-summary-value">{Math.max(0, (loadState.products ?? []).length - filEntries.rows.length)}</span>
-                      <span className="admin-summary-label">Pending</span>
+                      <span className="admin-summary-value">{filEntries.rows.filter(r => r.status === "PENDING").length}</span>
+                      <span className="admin-summary-label">Pending FIL</span>
                     </div>
                   </div>
                 </div>
@@ -755,7 +762,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{inr(row.systemPrpRate)}</td>
                             <td>{inr(row.systemDhagaRate)}</td>
                             <td>{row.userFilRate != null ? inr(row.userFilRate) : "—"}</td>
-                            <td><span className="admin-status-badge admin-status-badge--success">{row.status}</span></td>
+                            <td><span className={`admin-status-badge ${row.status === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.status}</span></td>
                             <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
