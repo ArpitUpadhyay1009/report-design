@@ -77,6 +77,9 @@ interface FilPolMergedRow {
   userPrpRate: number | null;
   userDhagaRate: number | null;
   status: string;
+  filStatus: string;
+  polStatus: string;
+  managerStatus: string;
   submittedAt: string;
 }
 
@@ -286,6 +289,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
         userPrpRate: rate.prp_rate != null ? Number(rate.prp_rate) : null,
         userDhagaRate: rate.dhaga_rate != null ? Number(rate.dhaga_rate) : null,
         status: type === "fil" ? (rate.fil_status ?? "") : (rate.pol_status ?? ""),
+        filStatus: rate.fil_status ?? "PENDING",
+        polStatus: rate.pol_status ?? "PENDING",
+        managerStatus: rate.manager_status ?? "PENDING",
         submittedAt: type === "fil" ? (rate.fil_submitted_at ?? "") : (rate.pol_submitted_at ?? ""),
       };
     });
@@ -319,6 +325,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           userPrpRate: null,
           userDhagaRate: null,
           status: "PENDING",
+          filStatus: "PENDING",
+          polStatus: "PENDING",
+          managerStatus: "PENDING",
           submittedAt: "",
         }));
 
@@ -357,6 +366,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           userPrpRate: null,
           userDhagaRate: null,
           status: "PENDING",
+          filStatus: "PENDING",
+          polStatus: "PENDING",
+          managerStatus: "PENDING",
           submittedAt: "",
         }));
 
@@ -763,7 +775,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                           <th rowSpan={2}>Difficulty</th>
                           <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
                           <th style={{ textAlign: "center", background: "#f0fff4", color: "#276749" }}>FIL User Rate</th>
-                          <th rowSpan={2}>Status</th>
+                          <th rowSpan={2}>FIL Status</th>
+                          <th rowSpan={2}>POL Status</th>
+                          <th rowSpan={2}>Manager Status</th>
                           <th rowSpan={2}>Submitted At</th>
                         </tr>
                         <tr>
@@ -783,7 +797,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{inr(row.systemPrpRate)}</td>
                             <td>{inr(row.systemDhagaRate)}</td>
                             <td>{row.userFilRate != null ? inr(row.userFilRate) : "—"}</td>
-                            <td><span className={`admin-status-badge ${row.status === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.status}</span></td>
+                            <td><span className={`admin-status-badge ${row.filStatus === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.filStatus}</span></td>
+                            <td><span className={`admin-status-badge ${row.polStatus === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.polStatus}</span></td>
+                            <td><span className={`admin-status-badge ${row.managerStatus === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.managerStatus}</span></td>
                             <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
@@ -853,7 +869,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                           <th rowSpan={2}>Difficulty</th>
                           <th colSpan={4} style={{ textAlign: "center", background: "#ebf4ff", color: "#2b6cb0" }}>System Rates</th>
                           <th colSpan={2} style={{ textAlign: "center", background: "#fdf2f8", color: "#97266d" }}>POL User Rates</th>
-                          <th rowSpan={2}>Status</th>
+                          <th rowSpan={2}>FIL Status</th>
+                          <th rowSpan={2}>POL Status</th>
+                          <th rowSpan={2}>Manager Status</th>
                           <th rowSpan={2}>Submitted At</th>
                         </tr>
                         <tr>
@@ -876,7 +894,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
                             <td>{inr(row.systemDhagaRate)}</td>
                             <td>{row.userPolRate != null ? inr(row.userPolRate) : "—"}</td>
                             <td>{row.userPrpRate != null ? inr(row.userPrpRate) : "—"}</td>
-                            <td><span className={`admin-status-badge ${row.status === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.status}</span></td>
+                            <td><span className={`admin-status-badge ${row.filStatus === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.filStatus}</span></td>
+                            <td><span className={`admin-status-badge ${row.polStatus === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.polStatus}</span></td>
+                            <td><span className={`admin-status-badge ${row.managerStatus === "COMPLETED" ? "admin-status-badge--success" : "admin-status-badge--pending"}`}>{row.managerStatus}</span></td>
                             <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
